@@ -71,7 +71,7 @@ class ConstantsStateOptimization(object):
             if ir.dag.vs[v]['type'] == NodeType.caller.value:
                 break
             if ir.dag.vs[v]['type'] == NodeType.op.value:
-                if 'cmp' in ir.dag.vs[v].attributes() and ir.dag.vs[v]['cmp'] != None:
+                if 'cmp' in ir.dag.vs[v].attributes() and ir.dag.vs[v]['cmp'] is not None:
                     break
                 gname = ir.dag.vs[v]['name']
                 qargs = ir.dag.vs[v]['qubits']
@@ -111,7 +111,7 @@ class ConstantsStateOptimization(object):
                         ir.substitute_nodes([v], new_dag, ir.dag.vs[v]['type'])
                         to_delete.append((v, False))
                 elif gname == SWAP.label:
-                    if self.wire_state[qargs[0]] == self.wire_state[qargs[1]] == None:
+                    if self.wire_state[qargs[0]] == self.wire_state[qargs[1]] is None:
                         continue
                     if self.wire_state[qargs[0]] == self.wire_state[qargs[1]]:
                         to_delete.append((v, True))

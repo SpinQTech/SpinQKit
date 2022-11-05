@@ -40,5 +40,5 @@ PYBIND11_MODULE(spinq_backends, m) {
     .def_readwrite("counts", &Result::counts)
     .def_readwrite("states", &Result::states)
     .def_readwrite("probabilities", &Result::probabilities)
-    .def("get_readings", &Result::get_readings);
+    .def("get_random_reading", &Result::get_random_reading);
 }

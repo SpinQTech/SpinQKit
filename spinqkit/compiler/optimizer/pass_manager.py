@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from ..ir import IntermediateRepresentation
-from .cancel_redundent_gates import CancelRedundentGates
+from .cancel_redundant_gates import CancelRedundantGates
 from .collapse_single_qubit_gates import CollapseSingleQubitGates
 from .collapse_two_qubit_gates import CollapseTwoQubitGates
 from .quantum_basis_state_optimization import ConstantsStateOptimization
@@ -23,14 +23,14 @@ class PassManager(object):
     def __init__(self, level: int):
         self.passes = []
         if level == 1:
-            self.passes.append(CancelRedundentGates())
+            self.passes.append(CancelRedundantGates())
             self.passes.append(CollapseSingleQubitGates())
         elif level == 2:
-            self.passes.append(CancelRedundentGates())
+            self.passes.append(CancelRedundantGates())
             self.passes.append(CollapseSingleQubitGates())
             self.passes.append(CollapseTwoQubitGates())
         elif level == 3:
-            self.passes.append(CancelRedundentGates())
+            self.passes.append(CancelRedundantGates())
             self.passes.append(ConstantsStateOptimization())
             self.passes.append(PureStateOnU())
             self.passes.append(CollapseSingleQubitGates())

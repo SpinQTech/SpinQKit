@@ -19,15 +19,20 @@ engine = get_triangulum()
 comp = get_compiler("native")
 
 circ = Circuit()
-q = circ.allocateQubits(2)
+
+q = circ.allocateQubits(3)
 circ << (H, q[0])
 circ << (CX, (q[0], q[1]))
-
+circ << (CX, (q[1], q[2]))
 
 exe = comp.compile(circ, 0)
 config = TriangulumConfig()
-config.configure_ip("192.168.1.186")
-config.configure_task("task1", "")
+config.configure_shots(1024)
+config.configure_ip("192.168.1.113")
+config.configure_port(55444)
+config.configure_account("user9", "123456")
+config.configure_task("task1", "GHZ")
 
 result = engine.execute(exe, config)
 print(result.probabilities)
+

@@ -50,10 +50,11 @@ T = Gate('T', "C1")
 Td = Gate('Td', "C1")
 S = Gate('S', "C1")
 Sd = Gate('Sd', "C1")
+CCX = Gate('CCX', "C3")
 Measure = Gate('Measure', "Measure")
 Barrier = Gate('Barrier', "Barrier")
 U = Gate('U', "U1")
-base_gate_list = [H, I, X, Y, Z, X90, Y90, Z90, X90dg, Y90dg, Z90dg, Rx, Ry, Rz, CNOT, YCON, ZCON, T, Td, S, Sd, Measure, Barrier, U]
+base_gate_list = [H, I, X, Y, Z, X90, Y90, Z90, X90dg, Y90dg, Z90dg, Rx, Ry, Rz, CNOT, YCON, ZCON, T, Td, S, Sd, CCX, Measure, Barrier, U]
 
 def find_gate(gname: str):
     for g in base_gate_list:

@@ -20,7 +20,8 @@ from spinqkit.model import I, H, X, Y, Z, Rx, Ry, Rz, T, Td, S, Sd, P, CX, CY, C
 X_series = {X.label, Rx.label}
 Y_series = {Y.label, Ry.label}
 Z_series = {Z.label, Rz.label, T.label, Td.label, S.label, Sd.label, P.label}
-CU_series = {CX.label, CY.label, CZ.label, CCX.label}
+CU_series = {CX.label, CY.label, CCX.label}
+SWAP_Series = {CZ.label, SWAP.label}
 
 def is_commutative(cur: Vertex, pre: Vertex):
     if cur['name'] in X_series and pre['name'] in X_series:
@@ -39,11 +40,11 @@ def is_commutative(cur: Vertex, pre: Vertex):
         if cur_qubits != pre_qubits:
             return False
         return True
-    elif cur['name'] == SWAP.label:
-        if pre['name'] != SWAP.label:
+    elif cur['name'] in SWAP_Series:
+        if cur['name'] != pre['name']:
             return False
-        cur_qubits = cur['qubits']
-        pre_qubits = pre['qubits'].reverse()
+        cur_qubits = set(cur['qubits'])
+        pre_qubits = set(pre['qubits'])
         if cur_qubits != pre_qubits:
             return False
         return True
@@ -53,7 +54,7 @@ def is_commutative(cur: Vertex, pre: Vertex):
         return False
 
 def cancellation_filter(v: int, g: Graph):
-    if 'cmp' in g.vs[v].attributes() and g.vs[v]['cmp'] != None:
+    if 'cmp' in g.vs[v].attributes() and g.vs[v]['cmp'] is not None:
         return False
     prev = g.predecessors(g.vs[v])
     if len(prev) == 0:

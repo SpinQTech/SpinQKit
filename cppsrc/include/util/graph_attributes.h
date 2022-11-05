@@ -15,6 +15,7 @@
  */
 
 #pragma once
+#include <vector>
 #include <string.h>
 #include <Python.h>
 #include <igraph/igraph.h>
@@ -141,15 +142,15 @@ static int exec_callable_vertex_attr(const igraph_t *graph,
     dict = ATTR_STRUCT_DICT(graph)[ATTRHASH_IDX_VERTEX];
     list = PyDict_GetItemString(dict, name);
     if (list == NULL)
-        return IGRAPH_EINVAL;
+        return 0;
 
     functions = PyList_GetItem(list, vid);
     if (functions == Py_None)
-        return IGRAPH_EINVAL;
+        return 0;
 
     Py_ssize_t length = PyList_Size(functions);
-    if (length <= 0 || length > index_size) {
-        return IGRAPH_EINVAL;
+    if (length <= 0) {
+        return 0;
     }
 
     IGRAPH_CHECK(igraph_vector_resize(value, length));    
@@ -159,18 +160,34 @@ static int exec_callable_vertex_attr(const igraph_t *graph,
         PyCodeObject *code = (PyCodeObject*)PyFunction_GET_CODE(fn);
         int argcount = code->co_argcount;
 
-        igraph_integer_t index = VECTOR(*indexes)[j];
-        if (index == -1) {
+        if (argcount == 0) {
             result = PyObject_CallObject(fn, NULL);
         } else {
-            PyObject *pArgs = PyTuple_New(argcount);
-            for (int k=0; k<argcount; k++) {
-                index = VECTOR(*indexes)[j+k];
-                PyTuple_SetItem(pArgs, k, Py_BuildValue("d", VECTOR(*params)[index]));
+            if (j > index_size-1) {
+                // cout<<argcount<<"    "<<index_size<<endl;
+                return IGRAPH_EINVAL; 
             }
+            igraph_integer_t index = VECTOR(*indexes)[j];
+            if (index == -1) {
+                PyObject *pArgs = PyTuple_New(1);
+                Py_ssize_t psize = (Py_ssize_t)igraph_vector_size(params);
+                PyObject *plist = PyList_New(psize);
+                for (Py_ssize_t k=0; k<psize; k++) {
+                    PyList_SetItem(plist, k, PyFloat_FromDouble(VECTOR(*params)[k]));
+                }
+                PyTuple_SetItem(pArgs, 0, plist);
+                result = PyObject_CallObject(fn, pArgs);
+            } else {
+                PyObject *pArgs = PyTuple_New(argcount);
+                for (int k=0; k<argcount; k++) {
+                    if (j+k > index_size-1) return IGRAPH_EINVAL;
+                    index = VECTOR(*indexes)[j+k];
+                    PyTuple_SetItem(pArgs, k, Py_BuildValue("d", VECTOR(*params)[index]));
+                }
 
-            result = PyObject_CallObject(fn, pArgs);
-            Py_XDECREF(pArgs);
+                result = PyObject_CallObject(fn, pArgs);
+                Py_XDECREF(pArgs);
+            }
         }
         j += argcount;
         VECTOR(*value)[i] = PyFloat_AsDouble(result);
@@ -186,14 +203,14 @@ static int get_numeric_list_vertex_attr(const igraph_t *graph,
     PyObject *dict, *list, *result;
     dict = ATTR_STRUCT_DICT(graph)[ATTRHASH_IDX_VERTEX];
     list = PyDict_GetItemString(dict, name);    
-    if (list == NULL)
+    if (list == NULL) {
         return IGRAPH_EINVAL;
+    }
 
     result = PyList_GetItem(list, vid);
     if (result == Py_None)
         return IGRAPH_EINVAL;
    
-    
     Py_ssize_t length = PyList_Size(result);
     if (length <= 0) {
         return IGRAPH_EINVAL;
@@ -321,6 +338,31 @@ static int get_vertex_id_by_attr(const igraph_t *graph,
     }
 
     return IGRAPH_EINVAL;
+}
+
+static int get_vertex_id_list_by_attr(const igraph_t *graph, 
+                          const char* attr_name, 
+                          int attr_value, 
+                          std::vector<int> & vids) {
+    Py_ssize_t n = 0;
+    PyObject *dict, *attr_list, *value, *id;
+    
+    dict = ATTR_STRUCT_DICT(graph)[ATTRHASH_IDX_VERTEX];
+    attr_list = PyDict_GetItemString(dict, attr_name);
+    if (attr_list == NULL)
+        return IGRAPH_EINVAL;
+    
+    while (n < PyList_Size(attr_list)) {
+        value = PyList_GetItem(attr_list, n);
+        if (value != Py_None) {
+            if (attr_value == (int)PyLong_AsLong((value))) {
+                vids.push_back((int)n);
+            }
+        }
+        n++;
+    }
+
+    return 0;
 }
 
 static int get_vertex_num_by_attr(const igraph_t *graph,

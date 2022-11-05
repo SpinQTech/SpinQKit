@@ -20,12 +20,12 @@ from .util import get_paths, get_matrix
 from spinqkit.model import Instruction, Ry, Rz
 
 def single_qubit_filter(v: int, g: Graph):
-    if 'cmp' in g.vs[v].attributes() and g.vs[v]['cmp'] != None:
+    if 'cmp' in g.vs[v].attributes() and g.vs[v]['cmp'] is not None:
         return False
     type = g.vs[v]['type']
     tflag = (type == NodeType.op.value or type == NodeType.callee.value)
     edges = g.vs[v].in_edges()
-    eflag = (len(edges) == 1 and 'qubit' in edges[0].attributes()) and edges[0]['qubit'] != None
+    eflag = (len(edges) == 1 and 'qubit' in edges[0].attributes()) and edges[0]['qubit'] is not None
     return tflag and eflag
 
 class CollapseSingleQubitGates(object):
@@ -37,14 +37,14 @@ class CollapseSingleQubitGates(object):
         for path in paths:
             if len(path) > 3:
                 node = ir.dag.vs[path[0]]
-                if 'params' in node.attributes() and node['params'] != None:
+                if 'params' in node.attributes() and node['params'] is not None:
                         op_matrix = get_matrix(node['name'], node['params'])
                 else:
                     op_matrix = get_matrix(node['name'])
                 
                 for index in path[1:]:
                     node = ir.dag.vs[index]
-                    if 'params' in node.attributes() and node['params'] != None:
+                    if 'params' in node.attributes() and node['params'] is not None:
                         op_matrix = get_matrix(node['name'], node['params']).dot(op_matrix)
                     else:
                         op_matrix = get_matrix(node['name']).dot(op_matrix)

@@ -18,14 +18,24 @@ from .backend_util import get_graph_capsule
 from spinqkit.compiler import IntermediateRepresentation, NodeType
 from spinqkit.model import Instruction
 from spinqkit.model import I, H, X, Y, Z, Rx, Ry, Rz, T, Td, S, Sd, P, CX, CY, CZ, SWAP, CCX, U, MEASURE
-from spinq_backends import Triangulum
+from spinqkit.spinq_backends import Triangulum
 
 class TriangulumConfig:
     def __init__(self):
         self.metadata = {}
 
+    def configure_shots(self, shots: int):
+        self.metadata['shots'] = shots
+
     def configure_ip(self, addr: str):
         self.metadata['ip'] = addr
+
+    def configure_port(self, port: int):
+        self.metadata['port'] = port
+
+    def configure_account(self, username: str, password: str):
+        self.metadata['username'] = username
+        self.metadata['password'] = password
 
     def configure_task(self, task_name: str, task_desc: str):
         self.metadata['task_name'] = task_name
@@ -42,7 +52,7 @@ class TriangulumBackend:
         while i < ir.dag.vcount():
             v = ir.dag.vs[i]
             if v['type'] == NodeType.op.value or v['type'] == NodeType.callee.value:
-                if 'cmp' in v.attributes() and v['cmp'] != None:
+                if 'cmp' in v.attributes() and v['cmp'] is not None:
                     raise Exception('Triangulum does not support conditional gates.')
                 if v['name'] == MEASURE.label:
                     raise Exception('Triangulum does not support the MEASURE gate.')
@@ -52,9 +62,9 @@ class TriangulumBackend:
                     qubits = []
                     clbits = []
                     for e in edges:
-                        if 'qubit' in e.attributes() and e['qubit'] != None:
+                        if 'qubit' in e.attributes() and e['qubit'] is not None:
                             qubits.append(e['qubit'])
-                        elif 'clbit' in e.attributes() and e['clbit'] != None:
+                        elif 'clbit' in e.attributes() and e['clbit'] is not None:
                             clbits.append(e['clbit'])
                     subgates = []
                     for sg, qidx, _ in SWAP.factors:
@@ -67,9 +77,9 @@ class TriangulumBackend:
                     qubits = []
                     clbits = []
                     for e in edges:
-                        if 'qubit' in e.attributes() and e['qubit'] != None:
+                        if 'qubit' in e.attributes() and e['qubit'] is not None:
                             qubits.append(e['qubit'])
-                        elif 'clbit' in e.attributes() and e['clbit'] != None:
+                        elif 'clbit' in e.attributes() and e['clbit'] is not None:
                             clbits.append(e['clbit'])
                     subgates = []
                     
@@ -84,14 +94,15 @@ class TriangulumBackend:
                         start = 0
                         for func in v['params']:
                             arg_count = func.__code__.co_argcount
-                            var_slice = var_full[start:start+1] if arg_count==0 else var_full[start:start+arg_count]
+                            var_slice = [] if arg_count == 0 else var_full[start:start + arg_count]
                             pindex_group.append(var_slice)
                             start += arg_count
-                       
+
                         subgates.append(Instruction(Rz, qubits, clbits, v['params'][2]))
                         subgates.append(Instruction(Ry, qubits, clbits, v['params'][0]))
                         subgates.append(Instruction(Rz, qubits, clbits, v['params'][1]))
-                        new_nodes = ir.substitute_nodes([v.index], subgates, v['type'], True)
+                        new_nodes = ir.substitute_nodes([v.index], subgates, v['type'])
+
                         nv1 = ir.dag.vs[new_nodes[0]]
                         nv1['pindex'] = pindex_group[2]
                         nv2 = ir.dag.vs[new_nodes[1]]

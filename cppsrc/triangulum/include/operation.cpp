@@ -73,14 +73,14 @@ Operation::Operation(const char * gate, int time_slot, int qubit0, int qubit1, i
 string Operation::to_string()
 {
     stringstream ss;
-    ss << "{\n";
-    ss << "\"angle\": " << m_angle << ",\n";
-    ss << "\"controlQubit\": " << m_control_qubit << ",\n";
-    ss << "\"controlQubit2\": " << m_control_qubit2 << ",\n";
-    ss << "\"delay\": " << m_delay << ",\n";
-    ss << "\"qubitIndex\": " << m_qubit_index << ",\n";
-    ss << "\"timeslot\": " << m_timeslot << ",\n";
-    ss << "\"type\": " << m_type << ",\n";
+    ss << "{";
+    ss << "\"angle\":" << m_angle << ",";
+    ss << "\"controlQubit\":" << m_control_qubit << ",";
+    ss << "\"controlQubit2\":" << m_control_qubit2 << ",";
+    ss << "\"delay\":" << m_delay << ",";
+    ss << "\"qubitIndex\":" << m_qubit_index << ",";
+    ss << "\"timeslot\":" << m_timeslot << ",";
+    ss << "\"type\":\"" << m_type << "\"";
     ss << "}";
     return ss.str();
 }

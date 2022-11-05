@@ -328,15 +328,6 @@ class Qasm2Listener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by Qasm2Parser#quantumGateSignature.
-    def enterQuantumGateSignature(self, ctx:Qasm2Parser.QuantumGateSignatureContext):
-        pass
-
-    # Exit a parse tree produced by Qasm2Parser#quantumGateSignature.
-    def exitQuantumGateSignature(self, ctx:Qasm2Parser.QuantumGateSignatureContext):
-        pass
-
-
     # Enter a parse tree produced by Qasm2Parser#quantumGateParameter.
     def enterQuantumGateParameter(self, ctx:Qasm2Parser.QuantumGateParameterContext):
         pass
@@ -352,6 +343,15 @@ class Qasm2Listener(ParseTreeListener):
 
     # Exit a parse tree produced by Qasm2Parser#quantumGateName.
     def exitQuantumGateName(self, ctx:Qasm2Parser.QuantumGateNameContext):
+        pass
+
+
+    # Enter a parse tree produced by Qasm2Parser#quantumGateSignature.
+    def enterQuantumGateSignature(self, ctx:Qasm2Parser.QuantumGateSignatureContext):
+        pass
+
+    # Exit a parse tree produced by Qasm2Parser#quantumGateSignature.
+    def exitQuantumGateSignature(self, ctx:Qasm2Parser.QuantumGateSignatureContext):
         pass
 
 

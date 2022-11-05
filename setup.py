@@ -1,4 +1,4 @@
-# Copyright 2021 SpinQ Technology Co., Ltd.
+# Copyright 2022 SpinQ Technology Co., Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ import setuptools
 import os
 import re
 import sys
-import sysconfig
+
 import platform
 import subprocess
 
@@ -81,22 +81,32 @@ class CMakeBuild(build_ext):
         subprocess.check_call(['cmake', '--build', '.'] + build_args,
                               cwd=self.build_temp)
 
+date_files_list = []
+if platform.system() == 'Windows':
+    final_place = ''
+    # if it is a windows and build to egg, modify its dll location
+    if sys.argv[1] in ['install', 'bdist_egg']:
+        final_place = 'spinqkit'
+    date_files_list = [(final_place, ['cppsrc/lib/SpinQInterface.dll'])]
+
 setup(
     name="spinqkit",
-    version="0.0.1-alpha",
+    version="0.0.2",
     description="SpinQ Quantum Software Development Kit",
-    packages=setuptools.find_packages(include=['spinqkit', 'spinqkit.*', 'qiskit', 'qiskit.*']),
-    package_dir={"": "."},
+    packages=find_packages(),
+    
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 5 - Production/Stable',
         "Programming Language :: Python :: 3",
         "Operating System :: Microsoft :: Windows",
-        "Operating System :: POSIX :: Linux"
+        "Operating System :: POSIX :: Linux",
+        "Operating System :: MacOS"
     ],
-    ext_modules=[CMakeExtension('spinq_backends')],
-    install_requires=['numpy', 'scipy', 'psutil', 'retworkx', 'python-igraph', 'pybind11', 'antlr4-python3-runtime', 'requests', 'pycryptodome>=3.11.0', 'pycairo==1.20.1'],
+    ext_modules=[CMakeExtension('spinqkit.spinq_backends')],
+    install_requires=['numpy', 'scipy', 'psutil', 'retworkx', 'python-igraph==0.9.10', 'pybind11', 'antlr4-python3-runtime==4.9.2', 'python-constraint', 'requests', 'matplotlib>=3.5', 'pycryptodome==3.11.0'],
     python_requires='>=3.8',
     cmdclass=dict(build_ext=CMakeBuild),
-    data_files=[('.', ['cppsrc/lib/SpinQInterface.dll'])],
+    package_data={'spinqkit': ['compiler/qasm/include/qelib1.inc']},
+    data_files=date_files_list,
     zip_safe=False
 )

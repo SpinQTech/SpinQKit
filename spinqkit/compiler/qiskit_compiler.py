@@ -13,9 +13,10 @@
 # limitations under the License.
 
 from spinqkit.compiler.compiler import Compiler
-from qiskit.circuit.quantumcircuit import QuantumCircuit
+from spinqkit.qiskit.circuit.quantumcircuit import QuantumCircuit
 from .native_compiler import NativeCompiler
 from .translator.qiskit_to_spinq import qiskit_to_spinq
+
 
 class QiskitCompiler(Compiler):
     def compile(self, qc: QuantumCircuit, level: int):

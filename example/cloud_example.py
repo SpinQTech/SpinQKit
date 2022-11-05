@@ -67,3 +67,4 @@ if gemini.available():
     print(res)
 else:
     print("No machine available for this platform.")
+

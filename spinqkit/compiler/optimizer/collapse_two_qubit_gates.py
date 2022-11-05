@@ -19,7 +19,7 @@ from ..ir import IntermediateRepresentation, NodeType
 from .util import get_paths, get_matrix, get_qubits
 
 def two_qubit_filter(v: int, g: Graph):
-    if 'cmp' in g.vs[v].attributes() and g.vs[v]['cmp'] != None:
+    if 'cmp' in g.vs[v].attributes() and g.vs[v]['cmp'] is not None:
         return False
     type = g.vs[v]['type']
     tflag = (type == NodeType.op.value or type == NodeType.callee.value)

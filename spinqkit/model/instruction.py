@@ -12,23 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Tuple
+from typing import List, Tuple, Union
 from .basic_gate import Gate
 from .gates import MEASURE
 import enum
 
+
 class Instruction(object):
-    def __init__(self, gate: Gate, qubits: List[int] = [], clbits: List[int] = [], *params: Tuple):
+    def __init__(self, gate: Gate, qubits=None, clbits=None, *params: Tuple):
+        if clbits is None:
+            clbits = []
+        if qubits is None:
+            qubits = []
         self.gate = gate
         self.qubits = qubits
         self.clbits = clbits
-        self.params = list(params)
+
+        if len(params) == 1 and (isinstance(*params, (float, int,)) or callable(*params)):
+            self.params = [*params]
+        else:
+            self.params = list(*params)
+
         self.condition = None
 
-        if len(qubits) > gate.qubit_num:
-            raise ValueError
-    
-    def set_condition(self, clbits: List, symbol: str, constant: int):
+        if len(qubits) != gate.qubit_num and gate.label not in ['MEASURE', 'BARRIER']:
+            raise ValueError('The number of qubits does not match the gate.')
+
+    def set_condition(self, clbits: Union[List, int], symbol: str, constant: int):
+        if isinstance(clbits, int):
+            clbits = [clbits]
         self.condition = (clbits, symbol, constant)
 
     def get_op(self) -> str:

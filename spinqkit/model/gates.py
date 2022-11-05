@@ -18,19 +18,19 @@ from cmath import exp, sqrt, sin, cos
 from .basic_gate import Gate, GateBuilder
 
 I = Gate('I', 1)
-I.matrix = lambda params: np.eye(2)
+I.matrix = lambda *args: np.eye(2)
 
 H = Gate('H', 1)
-H.matrix = lambda params: 1/sqrt(2) * np.array([[1,1],[1,-1]])
+H.matrix = lambda *args: 1/sqrt(2) * np.array([[1,1],[1,-1]])
 
 X = Gate('X', 1)
-X.matrix = lambda params: np.array([[0,1],[1,0]])
+X.matrix = lambda *args: np.array([[0,1],[1,0]])
 
 Y = Gate('Y', 1)
-Y.matrix = lambda params: np.array([[0,-1j],[1j,0]])
+Y.matrix = lambda *args: np.array([[0,-1j],[1j,0]], dtype=np.complex64)
 
 Z = Gate('Z', 1)
-Z.matrix = lambda params: np.array([[1,0],[0,-1]])
+Z.matrix = lambda *args: np.array([[1,0],[0,-1]])
 
 Rx = Gate('Rx', 1)
 Rx.matrix = lambda params: np.array([[cos(params[0]/2), -1j * sin(params[0]/2)],
@@ -47,16 +47,16 @@ P = Gate('P', 1)
 P.matrix = lambda params: np.array([[1, 0], [0, exp(1j*params[0])]])
 
 T = Gate('T', 1)
-T.matrix = lambda params: np.array([[1,0], [0,(1+1j)/sqrt(2)]])
+T.matrix = lambda *args: np.array([[1,0], [0,(1+1j)/sqrt(2)]])
 
 Td = Gate('Td', 1)
-Td.matrix = lambda params: np.array([[1,0], [0,(1-1j)/sqrt(2)]])
+Td.matrix = lambda *args: np.array([[1,0], [0,(1-1j)/sqrt(2)]])
 
 S = Gate('S', 1)
-S.matrix = lambda params: np.array([[1,0], [0, 1j]])
+S.matrix = lambda *args: np.array([[1,0], [0, 1j]])
 
 Sd = Gate('Sd', 1)
-Sd.matrix = lambda params: np.array([[1,0], [0, -1j]])
+Sd.matrix = lambda *args: np.array([[1,0], [0, -1j]])
 
 CX = Gate('CX', 2)
 CX.matrix = lambda params: np.array([[1,0,0,0], [0,1,0,0], [0,0,0,1], [0,0,1,0]]) if params[0] == 0 else \
@@ -69,25 +69,16 @@ CY.matrix = lambda params: np.array([[1,0,0,0], [0,1,0,0], [0,0,0,-1j], [0,0,1j,
                            np.array([[1,0,0,0], [0,0,0,-1j], [0,0,1,0], [0,1j,0,0]])
 
 CZ = Gate('CZ', 2)
-CZ.matrix = lambda params: np.array([[1,0,0,0], [0,1,0,0], [0,0,1,0], [0,0,0,-1]])
+CZ.matrix = lambda *args: np.array([[1,0,0,0], [0,1,0,0], [0,0,1,0], [0,0,0,-1]])
 
 U_builder = GateBuilder(1)
-U_builder.append(Rz, [0], lambda param: param[2])
-U_builder.append(Ry, [0], lambda param: param[0])
-U_builder.append(Rz, [0], lambda param: param[1])
+U_builder.append(Rz, [0], lambda params: params[2])
+U_builder.append(Ry, [0], lambda params: params[0])
+U_builder.append(Rz, [0], lambda params: params[1])
 
 U = U_builder.to_gate()
 U.matrix = lambda params: np.array([[cos(params[0]/2), -exp(1j*params[2]) * sin(params[0]/2)], 
                                    [exp(1j*params[1]) * sin(params[0]/2), exp(1j*(params[1]+params[2])) * cos(params[0]/2)]])
-
-CP_builder = GateBuilder(2)
-CP_builder.append(P, [0], lambda param: param[0]/2)
-CP_builder.append(CX, [0, 1])
-CP_builder.append(P, [1], lambda param: -param[0]/2)
-CP_builder.append(CX, [0, 1])
-CP_builder.append(P, [1], lambda param: param[0]/2)
-
-CP = CP_builder.to_gate()
 
 SWAP_builder = GateBuilder(2)
 SWAP_builder.append(CX, [0, 1])
@@ -95,7 +86,7 @@ SWAP_builder.append(CX, [1, 0])
 SWAP_builder.append(CX, [0, 1])
 
 SWAP = SWAP_builder.to_gate()
-SWAP.matrix = lambda params: np.array([[1,0,0,0], [0,0,1,0], [0,1,0,0], [0,0,0,1]])
+SWAP.matrix = lambda *args: np.array([[1,0,0,0], [0,0,1,0], [0,1,0,0], [0,0,0,1]])
 
 CCX_builder = GateBuilder(3)
 CCX_builder.append(H, [2])
@@ -115,7 +106,18 @@ CCX_builder.append(Td, [1])
 CCX_builder.append(CX, [0,1])
 
 CCX = CCX_builder.to_gate()
-CCX.matrix = lambda params: np.array([[1,0,0,0,0,0,0,0], [0,1,0,0,0,0,0,0], [0,0,1,0,0,0,0,0], [0,0,0,1,0,0,0,0], [0,0,0,0,1,0,0,0], [0,0,0,0,0,1,0,0], [0,0,0,0,0,0,0,1], [0,0,0,0,0,0,1,0]])
+CCX.matrix = lambda *args: np.array([[1,0,0,0,0,0,0,0], [0,1,0,0,0,0,0,0], [0,0,1,0,0,0,0,0], [0,0,0,1,0,0,0,0], [0,0,0,0,1,0,0,0], [0,0,0,0,0,1,0,0], [0,0,0,0,0,0,0,1], [0,0,0,0,0,0,1,0]])
+
+# CP_builder = GateBuilder(2)
+from .matrix_gate import MultiControlledMatrixGateBuilder
+CP_builder = MultiControlledMatrixGateBuilder(P.matrix, 1, 2)
+CP_builder.append(P, [0], lambda params: params[0]/2)
+CP_builder.append(CX, [0, 1])
+CP_builder.append(P, [1], lambda params: -params[0]/2)
+CP_builder.append(CX, [0, 1])
+CP_builder.append(P, [1], lambda params: params[0]/2)
+
+CP = CP_builder.to_gate()
 
 MEASURE = Gate('MEASURE', sys.maxsize)
 BARRIER = Gate('BARRIER', sys.maxsize)

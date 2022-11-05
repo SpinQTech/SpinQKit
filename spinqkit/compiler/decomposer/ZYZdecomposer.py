@@ -16,18 +16,18 @@ from scipy import linalg as lg
 import numpy as np
 import cmath, math
 
-def _params_zyz(mat):
-    coeff = lg.det(mat) ** (-0.5)
-    phase = -cmath.phase(coeff)
-    su_mat = coeff * mat
+# def _params_zyz(mat):
+#     coeff = lg.det(mat) ** (-0.5)
+#     phase = -cmath.phase(coeff)
+#     su_mat = coeff * mat
 
-    beta = 2 * math.atan2(abs(su_mat[1, 0]), abs(su_mat[0, 0]))
-    alphaplgamma2 = cmath.phase(su_mat[1, 1])
-    alphamigamma2 = cmath.phase(su_mat[1, 0])
-    gamma = alphaplgamma2 + alphamigamma2
-    alpha = alphaplgamma2 - alphamigamma2
+#     beta = 2 * math.atan2(abs(su_mat[1, 0]), abs(su_mat[0, 0]))
+#     alphaplgamma2 = cmath.phase(su_mat[1, 1])
+#     alphamigamma2 = cmath.phase(su_mat[1, 0])
+#     gamma = alphaplgamma2 + alphamigamma2
+#     alpha = alphaplgamma2 - alphamigamma2
 
-    return alpha, beta, gamma, phase
+#     return alpha, beta, gamma, phase
 
 def decompose_zyz(mat):
     coeff = lg.det(mat)

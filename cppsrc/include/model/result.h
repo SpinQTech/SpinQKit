@@ -20,6 +20,8 @@
 #include <vector>
 #include <string>
 #include <complex>
+#include <random>
+#include <math.h>
 using namespace std;
 
 class Result
@@ -31,6 +33,9 @@ public:
 public:
     Result();
     ~Result();
-    vector<string> get_readings();
+    string get_random_reading();
+private:
+    static int repeat;
+    string to_string(long key, size_t qnum);
 };
 #endif

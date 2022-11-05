@@ -21,7 +21,7 @@ def get_paths(graph: Graph, filter: Callable) -> List:
         Return one path every time because the vertex index may be modified.
     """
     result = []
-    if filter == None:
+    if filter is None:
         return result
 
     visited = set()
@@ -54,6 +54,6 @@ def get_qubits(v: Vertex) -> List[int]:
     in_edges.sort(key = lambda k: k.index)
     result = []
     for e in in_edges:
-        if 'qubit' in e.attributes() and e['qubit'] != None:
+        if 'qubit' in e.attributes() and e['qubit'] is not None:
             result.append(e['qubit'])
     return result

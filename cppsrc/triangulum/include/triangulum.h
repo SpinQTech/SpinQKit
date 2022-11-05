@@ -32,6 +32,7 @@ namespace py = pybind11;
 #include <set>
 #include <unordered_map>
 #include <map>
+#include <queue>
 #include <sstream>
 #include <iostream>
 #include <thread>
@@ -72,6 +73,24 @@ public:
             ip = iobj.cast<string>();
         }
 
+        unsigned short port = 55444;
+        if (config.contains("port")) {
+            py::object pobj = config["port"];
+            port = pobj.cast<uint16_t>();
+        }
+
+        string username = "";
+        if (config.contains("username")) {
+            py::object uobj = config["username"];
+            username = uobj.cast<string>();
+        }
+
+        string password = "";
+        if (config.contains("password")) {
+            py::object wobj = config["password"];
+            password = wobj.cast<string>();
+        }
+
         string task_name = "taskX";
         if (config.contains("task_name")) {
             py::object tnobj = config["task_name"];
@@ -101,7 +120,7 @@ public:
         
         vector<double> probabilities;
         #ifdef _WIN64
-            SpinQuasar::init(ip);
+            SpinQuasar::init(ip, port, username, password);
             probabilities = SpinQuasar::triangulum_run(task_name, task_desc, circuit_str, qnum);
         #endif
         size_t sz = probabilities.size();
@@ -113,7 +132,10 @@ public:
         return re;
     }
 private:
+    set<int> decompose(const igraph_t* g);
     int update_timelist(vector<int> & time_list, initializer_list<int> qil);
+    void expand_caller(const igraph_t *g, const char *gate_name, igraph_vector_t *qubits, igraph_vector_t *params, 
+                    vector<int> & time_list, vector<Operation> & gate_map);
     int translate(const igraph_t *g, vector<Operation> & gate_map);
 };
 

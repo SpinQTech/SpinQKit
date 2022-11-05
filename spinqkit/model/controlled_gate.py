@@ -19,30 +19,20 @@ from .basic_gate import Gate
 from .controlled_gate_decomposer import control_basis_decomposition
 
 class ControlledGate(Gate):
-    def __init__(self, gate: Gate):
-        self.__label = 'C' + gate.label
+    def __init__(self, gate: Gate):    
         self.__qubit_num = 1 + gate.qubit_num
-
         self.subgate = gate
         self.control_bits = 1
         if isinstance(gate, ControlledGate):
             self.control_bits += gate.control_bits
+            self.__label = 'C' + str(self.control_bits) + gate.label
+            self.base_gate = gate.base_gate
+        else:
+            self.__label = 'C' + gate.label
+            self.base_gate = gate
+        
         self.__matrix = None
         self.__factors = []
-
-    @property
-    def label(self) -> str:
-        return self.__label
-
-    @property
-    def qubit_num(self):
-        return self.__qubit_num
-
-    @property
-    def factors(self) -> List:
-        '''Define a controlled gate using the subgates from the gate builder.
-           params should be a lambda.
-        '''
         sub_factors = self.subgate.factors
         if len(sub_factors) > 0:
             for f in sub_factors:
@@ -54,18 +44,31 @@ class ControlledGate(Gate):
                     gate = ControlledGate(f[0])
                 qubits = [0]
                 qubits.extend([i+1 for i in f[1]])
-                params = f[2]
-                self.__factors.append((gate, qubits, params))
+                if len(f) > 2:
+                    params = f[2]
+                    self.__factors.append((gate, qubits, params))
+                else:
+                    self.__factors.append((gate, qubits))
         else:
             qubits = list(range(self.__qubit_num))
             factors = control_basis_decomposition(self.subgate, qubits)
-            self.__factors.extend(factors)
+            self.__factors = factors
 
+    @property
+    def label(self) -> str:
+        return self.__label
+
+    @property
+    def qubit_num(self):
+        return self.__qubit_num
+
+    @property
+    def factors(self) -> List:
         return self.__factors
 
     def get_matrix(self, *params):
-        m = self.subgate.get_matrix(params)
-        if m == None:
+        m = self.subgate.get_matrix(*params)
+        if m is None:
             return None
         m0 = np.zeros(len(m))
         m1 = np.eye(len(m))

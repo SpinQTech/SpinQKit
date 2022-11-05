@@ -98,9 +98,15 @@ public:
             //ToDo: combine the parallel results
             ps = results[0].get();
         } else {
+            vector<set<int>> complist = decompose(gptr);
             vector<int> vids;
-            for (int j = 0; j < igraph_vector_size(&vs_res); j++) {
-                vids.push_back(VECTOR(vs_res)[j]);
+            for (size_t i = 0; i < complist.size(); i++) {
+                for (int j = 0; j < igraph_vector_size(&vs_res); j++) {
+                    int vid = VECTOR(vs_res)[j];
+                    if (complist[i].find(vid) != complist[i].end()) {
+                        vids.push_back(vid);
+                    }
+                }
             }
             int qnum = get_numeric_graph_attr(gptr, qubit_num_attr);
             int cnum = get_numeric_graph_attr(gptr, clbit_num_attr);
@@ -136,9 +142,11 @@ private:
     size_t add_measurement(vector<vector<gate_unit>> & time_list, const vector<size_t> & qubits, const vector<size_t> & clbits);
     size_t add_element(const igraph_t *g, igraph_integer_t vid, unordered_map<int, size_t> & qreg_map, 
                     unordered_map<int, size_t> & creg_map, vector<vector<gate_unit>> & time_list);
-    size_t expand_caller(const igraph_t *g, igraph_integer_t vid, unordered_map<int, size_t> & qreg_map, 
-                    unordered_map<int, size_t> & creg_map, vector<vector<gate_unit>> & time_list);
-    circuit translate(const igraph_t *g, vector<int> component, int qnum, int cnum);
+    // size_t expand_caller(const igraph_t *g, igraph_integer_t vid, unordered_map<int, size_t> & qreg_map, 
+    //                 unordered_map<int, size_t> & creg_map, vector<vector<gate_unit>> & time_list);
+    size_t expand_caller(const igraph_t *g, const char *gate_name, igraph_vector_t *qubits, igraph_vector_t *params, const condition & cond, 
+                    unordered_map<int, size_t> & qreg_map, unordered_map<int, size_t> & creg_map, vector<vector<gate_unit>> & time_list);
+    circuit translate(const igraph_t *g, vector<int> & component, int qnum, int cnum);
     vector<double> simulate(const igraph_t *g, vector<int>& component, int qnum, int cnum, vector<StateType>& state);
 };
 

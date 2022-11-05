@@ -15,6 +15,7 @@
  */
 
 #include "result.h"
+int Result::repeat = 1024;
 
 Result::Result(/* args */)
 {
@@ -24,16 +25,45 @@ Result::~Result()
 {
 }
 
-vector<string> Result::get_readings()
+string Result::to_string(long key, size_t qnum)
 {
-    vector<string> readings;
-    if (counts.size() != 0) {
-        for (auto it = counts.begin(); it != counts.end(); ++it) {
-            for (int i=0; i<it->second; ++i) {
-                readings.push_back(it->first);
-            }
-        }
-    } 
+    std::ostringstream oss;
+    for (size_t j=qnum; j>=1; j--) {
+        oss << ((key>>(j-1)) & 1);
+    }
+    return oss.str();
+}
 
-    return readings;
+string Result::get_random_reading()
+{
+    // vector<string> readings;
+    // if (counts.size() != 0) {
+    //     for (auto it = counts.begin(); it != counts.end(); ++it) {
+    //         for (int i=0; i<it->second; ++i) {
+    //             readings.push_back(it->first);
+    //         }
+    //     }
+    // } 
+    auto it = probabilities.begin();
+    size_t qubit_num = it->first.length();
+    random_device seed;
+    mt19937_64 engine(seed());
+    uniform_int_distribution<long> distrib(0, (long)(pow(2, qubit_num)) - 1);
+    uniform_real_distribution<double> prob_gen(0.0, 1.0);
+    int run = 0;
+    while (run < repeat) {
+        long binary = distrib(engine);
+        double dist_bound = 0.0;
+        string binstr = to_string(binary, qubit_num);
+        if (probabilities.find(binstr) != probabilities.end()) {
+            dist_bound = probabilities[binstr];
+        }
+        double ran_val = prob_gen(engine);
+        if (ran_val <= dist_bound) {
+            return binstr; 
+        }
+        run += 1;
+    }
+   
+    return it->first;
 }

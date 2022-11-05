@@ -23,7 +23,7 @@
 
 inline double radian_to_angle(double radian)
 {
-    return fmod(radian, 2 * M_PI) / M_PI * 180;
+    return fmod(radian, 4 * M_PI) / M_PI * 180;
 }
 
 BasicSimulator::BasicSimulator(/* args */) {    
@@ -32,54 +32,91 @@ BasicSimulator::BasicSimulator(/* args */) {
 BasicSimulator::~BasicSimulator() {
 }
 
-vector<set<int>> BasicSimulator::decompose(const igraph_t* g) 
-{
+// vector<set<int>> BasicSimulator::decompose(const igraph_t* g) 
+// {
+//     vector<set<int>> results;
+//     std::set<int> all_nodes;
+//     igraph_vs_t vs;
+//     igraph_vit_t vit;
+//     igraph_vs_t adj_vs;
+//     igraph_vit_t adj_vit;
+
+//     igraph_vs_all(&vs);
+//     igraph_vit_create(g, vs, &vit);
+
+//     while (!IGRAPH_VIT_END(vit)) {
+//         all_nodes.insert((int)IGRAPH_VIT_GET(vit));
+//         IGRAPH_VIT_NEXT(vit);
+//     }
+    
+//     while(!all_nodes.empty()) {
+//         std::set<int> component;
+//         std::set<int>::iterator it = all_nodes.begin();
+        
+//         queue<int> vid_queue;
+//         vid_queue.push(*it);
+//         while (!vid_queue.empty()) {
+//             int v = vid_queue.front();
+//             vid_queue.pop();
+//             if (all_nodes.find(v) != all_nodes.end()) {
+//                 component.insert(v);
+//                 all_nodes.erase(v);
+//                 igraph_vs_adj(&adj_vs, v, IGRAPH_ALL);
+//                 igraph_vit_create(g, adj_vs, &adj_vit);
+//                 while (!IGRAPH_VIT_END(adj_vit)) {
+//                     vid_queue.push((int)IGRAPH_VIT_GET(adj_vit));
+//                     IGRAPH_VIT_NEXT(adj_vit);
+//                 }
+//                 igraph_vit_destroy(&adj_vit);
+//                 igraph_vs_destroy(&adj_vs);
+//             }
+//         }
+
+//         results.push_back(component);
+//     }
+
+//     igraph_vit_destroy(&vit);
+//     igraph_vs_destroy(&vs);
+    
+//     return results;
+// }
+
+vector<set<int>> BasicSimulator::decompose(const igraph_t* g) {
     vector<set<int>> results;
-    std::set<int> all_nodes;
-    igraph_vs_t vs;
-    igraph_vit_t vit;
+    vector<int> registers;
+    set<int> visited;
     igraph_vs_t adj_vs;
     igraph_vit_t adj_vit;
 
-    igraph_vs_all(&vs);
-    igraph_vit_create(g, vs, &vit);
-
-    while (!IGRAPH_VIT_END(vit)) {
-        all_nodes.insert((int)IGRAPH_VIT_GET(vit));
-        IGRAPH_VIT_NEXT(vit);
-    }
-    
-    while(!all_nodes.empty()) {
-        std::set<int> component;
-        std::set<int>::iterator it = all_nodes.begin();
-        
-        queue<int> vid_queue;
-        vid_queue.push(*it);
-        while (!vid_queue.empty()) {
-            int v = vid_queue.front();
-            vid_queue.pop();
-            if (all_nodes.find(v) != all_nodes.end()) {
-                component.insert(v);
-                all_nodes.erase(v);
-                igraph_vs_adj(&adj_vs, v, IGRAPH_ALL);
-                igraph_vit_create(g, adj_vs, &adj_vit);
-                while (!IGRAPH_VIT_END(adj_vit)) {
-                    vid_queue.push((int)IGRAPH_VIT_GET(adj_vit));
-                    IGRAPH_VIT_NEXT(adj_vit);
+    get_vertex_id_list_by_attr(g, node_type_attr, node_type_register, registers);
+    for (auto ite = registers.begin(); ite != registers.end(); ++ite) {
+        if (visited.find(*ite) == visited.end()) {
+            queue<int> vid_queue;
+            vid_queue.push(*ite);
+            std::set<int> component;
+            while (!vid_queue.empty()) {
+                int v = vid_queue.front();
+                vid_queue.pop();
+                if (visited.find(v) == visited.end()) {
+                    component.insert(v);
+                    visited.insert(v);
+                    igraph_vs_adj(&adj_vs, v, IGRAPH_ALL);
+                    igraph_vit_create(g, adj_vs, &adj_vit);
+                    while (!IGRAPH_VIT_END(adj_vit)) {
+                        vid_queue.push((int)IGRAPH_VIT_GET(adj_vit));
+                        IGRAPH_VIT_NEXT(adj_vit);
+                    }
+                    igraph_vit_destroy(&adj_vit);
+                    igraph_vs_destroy(&adj_vs);
                 }
-                igraph_vit_destroy(&adj_vit);
-                igraph_vs_destroy(&adj_vs);
             }
+            results.push_back(component);
         }
-
-        results.push_back(component);
     }
 
-    igraph_vit_destroy(&vit);
-    igraph_vs_destroy(&vs);
-    
     return results;
 }
+
 
 inline void append_I_gate(vector<vector<gate_unit>> & time_list, size_t qubit, int timeslot, int last)
 {
@@ -214,7 +251,6 @@ inline size_t BasicSimulator::add_element(const igraph_t *g,
     
     char *gate_name;
     get_string_vertex_attr(g, node_name_attr, vid, &gate_name);
-
     // get qargs
     igraph_es_incident(&es, vid, IGRAPH_IN);
     // get_numeric_edge_attrs(g, edge_qubit_attr, es, &qubit_res);
@@ -290,39 +326,14 @@ inline size_t BasicSimulator::add_element(const igraph_t *g,
  * Expand a caller node by its definition.
  */
 inline size_t BasicSimulator::expand_caller(const igraph_t *g, 
-                                 igraph_integer_t vid, 
+                                 const char *gate_name, 
+                                 igraph_vector_t *qubits, 
+                                 igraph_vector_t *params, 
+                                 const condition & cond,
                                  unordered_map<int, size_t> & qreg_map,
                                  unordered_map<int, size_t> & creg_map,
                                  vector<vector<gate_unit>> & time_list)
 {
-    igraph_es_t es;
-    igraph_vector_t qubit_res;
-    igraph_vector_t params_res;
-    
-    igraph_vector_init(&qubit_res, 0);
-    igraph_vector_init(&params_res, 0);
-    
-    char *gate_name;
-    get_string_vertex_attr(g, node_name_attr, vid, &gate_name);
-
-    // get qargs
-    igraph_es_incident(&es, vid, IGRAPH_IN);
-    // get_numeric_edge_attrs(g, edge_qubit_attr, es, &qubit_res);
-    get_numeric_list_vertex_attr(g, node_qubits_attr, vid, &qubit_res);
-
-    // get params
-    get_numeric_list_vertex_attr(g, node_params_attr, vid, &params_res);
-
-    condition cond;
-    igraph_real_t relation;
-    int ret = get_numeric_vertex_attr(g, node_cmp_attr, vid, &relation);
-    if (ret == 0) {
-        cond = std::move(get_condition_from_vertex(g, vid, es, relation));
-        for (auto ite = cond.m_clbits.begin(); ite != cond.m_clbits.end(); ++ite) {
-            *ite = creg_map.at(*ite);
-        }
-    }
-    
     size_t max_time_slot = 0;
 
     igraph_integer_t root;
@@ -334,6 +345,7 @@ inline size_t BasicSimulator::expand_caller(const igraph_t *g,
 
     char *callee_name;
     igraph_es_t callee_es;
+    igraph_vector_t qubit_list;
     igraph_vector_t qindex_list;
     igraph_vector_t param_list;
     igraph_vector_t pindex_list;
@@ -344,7 +356,7 @@ inline size_t BasicSimulator::expand_caller(const igraph_t *g,
         
         get_string_vertex_attr(g, node_name_attr, callee, &callee_name);
 
-        igraph_es_incident(&callee_es, callee, IGRAPH_IN);       
+        igraph_es_incident(&callee_es, callee, IGRAPH_IN);      
         igraph_vector_init(&qindex_list, 0);
         igraph_vector_init(&param_list, 0);
         igraph_vector_init(&pindex_list, 0);
@@ -353,14 +365,25 @@ inline size_t BasicSimulator::expand_caller(const igraph_t *g,
         get_numeric_list_vertex_attr(g, node_params_index, callee, &pindex_list);
 
         size_t gate_time_slot = 0;
-        long int qsize = igraph_vector_size(&qindex_list);
-        igraph_integer_t qindex0 = VECTOR(qindex_list)[0];
-        int ori_qubit0 = (int)VECTOR(qubit_res)[qindex0];
-        size_t qb0 = qreg_map[ori_qubit0];
+        long qsize = igraph_vector_size(&qindex_list);
+        igraph_vector_init(&qubit_list, qsize); 
+
+        for (long i = 0; i < qsize; i++) {
+            igraph_integer_t index = VECTOR(qindex_list)[i];
+            VECTOR(qubit_list)[i] = VECTOR(*qubits)[index]; 
+        }
+        
+        // igraph_integer_t qindex0 = VECTOR(qindex_list)[0];
+        // int ori_qubit0 = (int)VECTOR(qubit_res)[qindex0];
+        // size_t qb0 = qreg_map[ori_qubit0];
 
         long int psize = igraph_vector_size(&pindex_list);
-        exec_callable_vertex_attr(g, node_params_attr, callee, &params_res, &pindex_list, psize, &param_list);
-        
+        // cout<<gate_name<<"  "<<callee_name<<"  "<<psize<<"  "<<VECTOR(*params)[0]<<endl;
+        int err_code = exec_callable_vertex_attr(g, node_params_attr, callee, params, &pindex_list, psize, &param_list);
+        if (err_code != 0) {
+            throw std::runtime_error("Something is wrong with callee parameters.");
+        }
+
         condition callee_cond;
         if (cond.isValid()) {
             callee_cond = cond;
@@ -375,26 +398,35 @@ inline size_t BasicSimulator::expand_caller(const igraph_t *g,
             }
         }
 
-        if (qsize == 1) {
-            if (igraph_vector_size(&param_list) > 0) {
-                double angle = radian_to_angle(VECTOR(param_list)[0]);
-                gate_time_slot = append_to_timelist(time_list, callee_name, {qb0}, {angle}, callee_cond);
-            } else {
-                gate_time_slot = append_to_timelist(time_list, callee_name, {qb0}, {}, callee_cond);
+        igraph_real_t type = node_type_callee;
+        get_numeric_vertex_attr(g, node_type_attr, callee, &type);
+        if (((igraph_integer_t)type) == node_type_caller) {
+            // cout<<"nnnnnnnn      " << VECTOR(param_list)[0] << endl;
+            gate_time_slot = expand_caller(g, callee_name, &qubit_list, &param_list, callee_cond, qreg_map, creg_map, time_list);
+        } else {
+            int ori_qubit0 = (int)VECTOR(qubit_list)[0];
+            size_t qb0 = qreg_map[ori_qubit0];
+            if (qsize == 1) {
+                if (igraph_vector_size(&param_list) > 0) {
+                    double angle = radian_to_angle(VECTOR(param_list)[0]);
+                    gate_time_slot = append_to_timelist(time_list, callee_name, {qb0}, {angle}, callee_cond);
+                } else {
+                    gate_time_slot = append_to_timelist(time_list, callee_name, {qb0}, {}, callee_cond);
+                }
+            } else if (qsize == 2) {
+                // igraph_integer_t qindex1 = VECTOR(qindex_list)[1];
+                int ori_qubit1 = (int)VECTOR(qubit_list)[1];
+                size_t qb1 = qreg_map[ori_qubit1];
+                gate_time_slot = append_to_timelist(time_list, callee_name,{qb0, qb1}, {}, callee_cond);
+            } else if (qsize == 3) {
+                // igraph_integer_t qindex1 = VECTOR(qindex_list)[1];
+                int ori_qubit1 = (int)VECTOR(qubit_list)[1];
+                size_t qb1 = qreg_map[ori_qubit1];
+                // igraph_integer_t qindex2 = VECTOR(qindex_list)[2];
+                int ori_qubit2 = (int)VECTOR(qubit_list)[2];
+                size_t qb2 = qreg_map[ori_qubit2];
+                gate_time_slot = append_to_timelist(time_list, callee_name,{qb0, qb1, qb2}, {}, callee_cond);
             }
-        } else if (qsize == 2) {
-            igraph_integer_t qindex1 = VECTOR(qindex_list)[1];
-            int ori_qubit1 = (int)VECTOR(qubit_res)[qindex1];
-            size_t qb1 = qreg_map[ori_qubit1];
-            gate_time_slot = append_to_timelist(time_list, callee_name,{qb0, qb1}, {}, callee_cond);
-        } else if (qsize == 3) {
-            igraph_integer_t qindex1 = VECTOR(qindex_list)[1];
-            int ori_qubit1 = (int)VECTOR(qubit_res)[qindex1];
-            size_t qb1 = qreg_map[ori_qubit1];
-            igraph_integer_t qindex2 = VECTOR(qindex_list)[2];
-            int ori_qubit2 = (int)VECTOR(qubit_res)[qindex2];
-            size_t qb2 = qreg_map[ori_qubit2];
-            gate_time_slot = append_to_timelist(time_list, callee_name,{qb0, qb1, qb2}, {}, callee_cond);
         }
        
         if (gate_time_slot > max_time_slot) {
@@ -404,19 +436,15 @@ inline size_t BasicSimulator::expand_caller(const igraph_t *g,
         free(callee_name);
         igraph_es_destroy(&callee_es);
         igraph_vector_destroy(&qindex_list);
+        igraph_vector_destroy(&qubit_list);
         igraph_vector_destroy(&pindex_list);
         igraph_vector_destroy(&param_list);
     }
     
-    free(gate_name);
-    igraph_es_destroy(&es);
-    igraph_vector_destroy(&qubit_res);
-    igraph_vector_destroy(&params_res);
-
     return max_time_slot;
 } 
 
-circuit BasicSimulator::translate(const igraph_t *g, vector<int> component, int qnum, int cnum) 
+circuit BasicSimulator::translate(const igraph_t *g, vector<int> & component, int qnum, int cnum) 
 {
     vector<vector<gate_unit>> time_list(qnum, vector<gate_unit>());
     size_t max_time_slot = 0;
@@ -425,7 +453,6 @@ circuit BasicSimulator::translate(const igraph_t *g, vector<int> component, int 
     size_t ccounter = 0;
     unordered_map<int, size_t> qreg_map;
     unordered_map<int, size_t> creg_map;
-    
     for (int i = 0; i < component.size(); i++) {
         int vid = component[i];
         igraph_real_t type = node_type_op;
@@ -454,8 +481,41 @@ circuit BasicSimulator::translate(const igraph_t *g, vector<int> component, int 
         int gate_time_slot = 0;
         if (((igraph_integer_t)type) == node_type_op) 
             gate_time_slot = add_element(g, vid, qreg_map, creg_map, time_list); 
-        else if (((igraph_integer_t)type) == node_type_caller)
-            gate_time_slot = expand_caller(g, vid, qreg_map, creg_map, time_list);
+        else if (((igraph_integer_t)type) == node_type_caller) {
+            igraph_es_t es;
+            igraph_vector_t qubit_res;
+            igraph_vector_t params_res;
+            
+            igraph_vector_init(&qubit_res, 0);
+            igraph_vector_init(&params_res, 0);
+            
+            char *gate_name;
+            get_string_vertex_attr(g, node_name_attr, vid, &gate_name);
+
+            // get qargs
+            igraph_es_incident(&es, vid, IGRAPH_IN);
+            // get_numeric_edge_attrs(g, edge_qubit_attr, es, &qubit_res);
+            get_numeric_list_vertex_attr(g, node_qubits_attr, vid, &qubit_res);
+
+            // get params
+            get_numeric_list_vertex_attr(g, node_params_attr, vid, &params_res);
+
+            condition cond;
+            igraph_real_t relation;
+            int ret = get_numeric_vertex_attr(g, node_cmp_attr, vid, &relation);
+            if (ret == 0) {
+                cond = std::move(get_condition_from_vertex(g, vid, es, relation));
+                for (auto ite = cond.m_clbits.begin(); ite != cond.m_clbits.end(); ++ite) {
+                    *ite = creg_map.at(*ite);
+                }
+            }
+            // cout<<"ddddd      " << vid << "  " << VECTOR(params_res)[0] << endl;
+            gate_time_slot = expand_caller(g, gate_name, &qubit_res, &params_res, cond, qreg_map, creg_map, time_list);
+            free(gate_name);
+            igraph_es_destroy(&es);
+            igraph_vector_destroy(&qubit_res);
+            igraph_vector_destroy(&params_res);
+        }
 
         if (gate_time_slot > max_time_slot) max_time_slot = gate_time_slot;
     }
@@ -466,10 +526,20 @@ circuit BasicSimulator::translate(const igraph_t *g, vector<int> component, int 
     for (int t = 0; t <= max_time_slot; t++) {
         vector<gate_unit> cunit;
         for (int q = 0; q < qnum; q++) {
-            if (measured_qubits.find(q) != measured_qubits.end())
-                continue;
+            if (measured_qubits.find(q) != measured_qubits.end()) {
+                    if (t < time_list[q].size()) {
+                        gate_unit& gu = time_list[q][t];        
+                        if (gu.getGateIndex() != I) {
+                            string msg = "Qubit ";
+                            msg += std::to_string(q);
+                            msg += " has been measured.";
+                            throw std::runtime_error(msg);
+                        }
+                    }
+                    continue;
+            }
             if (t < time_list[q].size()) {
-                gate_unit& gu = time_list[q][t];        
+                gate_unit& gu = time_list[q][t];          
                 if (gu.getGateIndex() != INVALID_GATE){
                     cunit.push_back(gu); 
                 }
@@ -480,12 +550,10 @@ circuit BasicSimulator::translate(const igraph_t *g, vector<int> component, int 
                 cunit.emplace_back("I", q);
             }    
         }
-
         circuits.emplace_back(cunit);   
     }
-    
+
     circuit circ(circuits, cnum);
-    // circuit circ;
 
     return circ;
 }
@@ -497,10 +565,10 @@ vector<double> BasicSimulator::simulate(const igraph_t *g, vector<int>& componen
     // cout << cc << endl;
     
     state_manager mgr;
-    mgr.execute(circ);
-    
+    mgr.execute_inplace(circ);
     vector<double> ps = mgr.getProbabilities();
     state = mgr.getStateVector();
+
     return ps;
 }
 
@@ -548,19 +616,29 @@ map<string, double> BasicSimulator::pack_probabilities(const vector<double>& pro
 map<string, int> BasicSimulator::calc_counts(const map<string, double>& probabilities, int shots)
 {
     map<string, int> counts;
-    
+    // vector<string> more;
+    vector<string> less;
+
     int sum = 0;
     for (auto it = probabilities.begin(); it != probabilities.end(); ++it) {
         double p = it->second;
-        int cnt = (int)round(p * shots);
+        double val = p * shots;
+        int cnt = (int)val;
+        double rval = round(val);
         if (cnt > 0) {
             counts[it->first] = cnt;
             sum += cnt;
         }
+        if(rval > val) less.push_back(it->first); 
     }
-    if (shots != sum) {
-        auto rit = counts.rbegin();
-        rit->second += (shots - sum);
+    if (shots > sum) {
+        int total = shots - sum;
+        for (size_t i = 0; i < less.size(); i++)
+        {
+            counts[less[i]] += 1;
+            total--;
+            if(total==0) break;
+        }
     }
     
     return counts;

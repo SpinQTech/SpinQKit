@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List
+from typing import List, Dict, Set
+from igraph import Graph
 from spinqkit.compiler.ir import NodeType, IntermediateRepresentation
 from ..exceptions import CircuitOperationParsingError, CircuitOperationValidationError
 from .gate import *
 from .platform import *
 from typing import Optional
-from ..gates import H, CX
+from ..gates import H, CX, CY, CZ
 from ..instruction import Instruction
 import math
 from queue import Queue
@@ -71,13 +72,6 @@ class Circuit:
     def to_dict(self):
         return {"operations": [o.to_dict() for o in self._operations], "definitions": []}
 
-def _topological_sorted_vertex(g):
-        vidx_list = g.topological_sorting()
-        vs = []
-        for vidx in vidx_list:
-            vs.append(g.vs[vidx])
-        return vs
-
 def _count_qubits(vs):
         count = 0
         for v in vs:
@@ -101,11 +95,24 @@ def convert_cz(v):
     subgates.append(Instruction(H, [qubits[1]], clbits))
     return subgates
 
+def _add_swaps_to_circuit(circuitboard, swap_qubits) -> List[CircuitOperation]:
+    op_list = []
+    for qubits in swap_qubits:
+        op_list.append(_vertex_to_circuit_operation(circuitboard, 'CNOT', qubits, []))
+        op_list.append(_vertex_to_circuit_operation(circuitboard, 'CNOT', qubits[::-1], []))
+        op_list.append(_vertex_to_circuit_operation(circuitboard, 'CNOT', qubits, []))
+    return op_list
+
 def _vertex_to_circuit_operation(circuitboard, name, qubits, arguments) -> CircuitOperation:
+    if name == CX.label:
+        name = 'CNOT'
+    elif name == CY.label:
+        name = 'YCON'
+    elif name == CZ.label:
+        name = 'ZCON'
     gate = find_gate(name)
     if gate is None:
         raise CircuitOperationParsingError("Gate with name = " + name + " is not support by spinq cloud.")
-    arguments = arguments
     largest_slot = 0
     if gate.gtag == 'Barrier':
         qubits = [q+1 for q in qubits]
@@ -136,8 +143,26 @@ def _vertex_to_circuit_operation(circuitboard, name, qubits, arguments) -> Circu
             else:
                 row.append('|')
         return  CircuitOperation(largest_slot+1, gate, True, qubits, arguments)
+    elif gate.gtag == "C3": # two-control gates
+        qubits = [qubits[2]+1, qubits[0]+1, qubits[1]+1]
+        for row in circuitboard[min(qubits)-1:max(qubits)]:
+            largest_slot = max(largest_slot, len(row))
+        # append operation to each qubits
+        for row_idx in range(min(qubits)-1, max(qubits)):
+            row = circuitboard[row_idx]
+            while len(row) < largest_slot:
+                row.append('*')
+            if row_idx == (qubits[1]-1):
+                row.append(gate.gname + "_c")
+            elif row_idx == (qubits[2]-1):
+                row.append(gate.gname + "_c")
+            elif row_idx == (qubits[0]-1):
+                row.append(gate.gname + "_t")
+            else:
+                row.append('|')
+        return  CircuitOperation(largest_slot+1, gate, True, qubits, arguments)
     elif gate.gtag == "U1":
-        # U(theta, phi, lambda)转化为Rz(phi)Ry(theta)Rz(lambda)
+        # U(theta, phi, lambda) to Rz(phi)Ry(theta)Rz(lambda)
         circuitboard[qubits[0]].append(gate.gname)
         # convert to our operation structure
         theta = round (float(math.degrees(arguments[0])), 1)
@@ -148,7 +173,7 @@ def _vertex_to_circuit_operation(circuitboard, name, qubits, arguments) -> Circu
         return  CircuitOperation(len(circuitboard[qubits[0]-1]), gate, True, qubits, arguments)
     elif gate.gtag == "R1":
         # convert to our operation structure
-        degree = round (float(math.degrees(arguments[0]))%360, 1)
+        degree = round (float(math.degrees(arguments[0]))%720, 1)
         circuitboard[qubits[0]].append(gate.gname + " " + str(degree))
         qubits = [qubits[0]+1]
         arguments = [degree]
@@ -170,91 +195,136 @@ def _transfer_arguments(global_arguments, local_arguments, func):
     args = [global_arguments[x] for x in local_arguments]
     return func(*args)
 
-def _expand_customized_gate(def_name, sorted_vs, g):
-    if sorted_vs is None:
-        raise CircuitOperationParsingError("Miss necessary variable sorted vertex list")
-    def_v = g.vs.find(def_name, type=2)
-    callee_q=Queue(maxsize=0)
-    callee_set = set()
-    for v in def_v.successors():
-        callee_q.put(v)
-    while not callee_q.empty():
-        item = callee_q.get()
-        callee_set.add(item.index)
-        for v in item.successors():
-            callee_q.put(v)
-    sorted_callee_list = [v for v in sorted_vs if v.index in callee_set ]
+def _dfs(root_index: int, graph: Graph, visited: Set, result: List):
+    successors = graph.neighbors(root_index, mode='out')
+    for s in successors:
+        if not s in visited:
+            _dfs(s, graph, visited, result)
+    result.append(root_index)
+    visited.add(root_index)
+
+def topological_sort_by_dfs(roots: List[int], graph: Graph):
+    visited = set()
+    result = []
+    for vidx in roots:
+        _dfs(vidx, graph, visited, result)
+    return result[::-1]
+
+def _expand_customized_gate(def_name: str, g: Graph):
+    def_v = g.vs.find(def_name, type=NodeType.definition.value)
+    callee_idx_list = topological_sort_by_dfs([def_v.index], g)
+    callee_idx_list = callee_idx_list[1:]
+    sorted_callee_list = [g.vs[idx] for idx in callee_idx_list ]
     return sorted_callee_list
 
-def _customized_vertex_to_circuit_operation(circuitboard, gatename, v) -> CircuitOperation:
-    global_qubits = v['qubits']
-    global_arguments = v['params']
+def _customized_vertex_to_circuit_operation(circuitboard, gatename, vindex, global_qubits, global_arguments, 
+                                            swap_fixes, gate_updates, graph) -> List[CircuitOperation]:    
+
     callee_list = customized_op[gatename]
     oplist = []
-    for g in callee_list:
-        sub_qubits = g['qubits']
+    for callee in callee_list:
+        sub_qubits = callee['qubits']
         final_qubits = _transfer_qubits(global_qubits, sub_qubits)
         final_arguments = []
-        if g['params'] is not None and len(g['params']) > 0:
-            for p in g['params']:
+        if callee['params'] is not None and len(callee['params']) > 0:
+            start = 0
+            for p in callee['params']:
                 if isinstance(p, (int, float)):
                     final_arguments.append(p)
                 else:
-                    sub_arguments = []
-                    if 'pindex' in g.attributes() and g['pindex'] is not None and len(g['pindex']) > 0:
-                        sub_arguments = g['pindex']
-                    final_arg = _transfer_arguments(global_arguments, sub_arguments, p)
+                    if len(callee['pindex']) == 1 and callee['pindex'][0] == -1:
+                        final_arg = p(global_arguments)
+                    else:
+                        local_args = []
+                        arg_count = p.__code__.co_argcount
+                        local_args = [] if arg_count == 0 else callee['pindex'][start:start + arg_count]
+                        start += arg_count
+                        arg_inputs = []
+                    
+                        for x in local_args:
+                            if x >= len(global_arguments):
+                                raise ValueError("Global args with idx = " + str(x) + " does not exists.")
+                            else:
+                                arg_inputs.append(global_arguments[x])
+                        final_arg = p(*arg_inputs)
                     final_arguments.append(final_arg)
-        op = _vertex_to_circuit_operation(circuitboard, g["name"], final_qubits, final_arguments)
-        oplist.append(op)
+        if isinstance(vindex, tuple):
+            gate_index = (*vindex, callee.index)
+        else:
+            gate_index = (vindex, callee.index)
+        
+        if swap_fixes is not None and gate_index in swap_fixes:
+            swap_list = _add_swaps_to_circuit(circuitboard, swap_fixes[gate_index])
+            oplist.extend(swap_list)
+        if gate_updates is not None and gate_index in gate_updates:
+            final_qubits = gate_updates[gate_index]
+
+        if callee["type"] == NodeType.caller.value:
+            callername = callee["name"]
+            if callername not in customized_op:
+                customized_op[callername] = _expand_customized_gate(callername, graph)
+            result_list = _customized_vertex_to_circuit_operation(circuitboard, callername, gate_index, final_qubits, final_arguments, swap_fixes, gate_updates, graph)
+            oplist.extend(result_list)
+        else:
+            op = _vertex_to_circuit_operation(circuitboard, callee["name"], final_qubits, final_arguments)
+            oplist.append(op)
     return oplist
 
 def _is_valid(operation: CircuitOperation, platform: Platform) -> bool:
     if not platform.has_gate(operation.gate):
-        raise CircuitOperationValidationError("This gate " + operation.gate.gname + " does not support by the " + platform.code + " platform.")
-    if  operation.gate.gtag == "C2" and ((operation.qubits[0], operation.qubits[1]) not in platform.coupling_map):
-        raise CircuitOperationValidationError("Two-bit gate " + operation.gate.gname + " does not follow the topology.")
-    if  operation.gate.gtag == "R1" and (operation.arguments[0] < 0 or operation.arguments[0] > 360):
-        raise CircuitOperationValidationError("Rotation degree " + operation.arguments[0] + " is invalid, must from 0 to 360.")
-    if  operation.gate.gtag == "U1":
-        for i in range(3):
-            if operation.arguments[i] < 0 or operation.arguments[i] > 360:
-                raise CircuitOperationValidationError("Rotation degree " + operation.arguments[i] + " is invalid, must from 0 to 360.")
+        raise CircuitOperationValidationError("Current platform does not support " + operation.gate.gname + " gate.")
     return True
 
-def graph_to_circuit(ir: IntermediateRepresentation, platform:Optional[str]=None) -> Circuit:
+def graph_to_circuit(ir: IntermediateRepresentation, 
+                    logical_to_physical: Dict, 
+                    platform:Optional[Platform]=None, 
+                    swap_fixes: Optional[List]=None, 
+                    gate_updates:Optional[List]=None) -> Circuit:
     global customized_op
-    # if platform is not null, validate the circuit with the platform's rule
-    p = None
-    if platform is not None:
-        p = find_platform(platform)
-    # all gate vertex sorted by topology
-    sorted_vs = _topological_sorted_vertex(ir.dag)
+
+    registers = ir.dag.vs.select(type = NodeType.register.value)
+    reg_indices = [node.index for node in registers]
+    main_thread_vidx_list = topological_sort_by_dfs(reg_indices, ir.dag)
+    main_thread_vx_list = [ir.dag.vs[vidx] for vidx in main_thread_vidx_list]
+
     # get total qubit_size
-    qubit_size = _count_qubits(sorted_vs)
-    if p is not None and p.max_bitnum < qubit_size:
+    qubit_size = _count_qubits(main_thread_vx_list)
+    if platform is not None and platform.max_bitnum < qubit_size:
         raise CircuitOperationValidationError("Register more bits than the platform supplies.")
     # convert each vertex in graph to a circuit operation
+    # only go through main thread
+
     operations = []
     circuitboard = [[] for i in range(qubit_size)]
-    for v in sorted_vs:
+    for v in main_thread_vx_list:
         if v["type"] == NodeType.op.value:
             arguments = []
             if 'params' in v.attributes() and v['params'] is not None and len(v['params']) > 0:
                 arguments = v['params']
             # single gate
-            op = _vertex_to_circuit_operation(circuitboard, v['name'], v['qubits'], arguments)
-            if p is None or _is_valid(op, p):
+            if swap_fixes is not None and v.index in swap_fixes:
+                swap_list = _add_swaps_to_circuit(circuitboard, swap_fixes[v.index])
+                operations.extend(swap_list)
+            if gate_updates is not None and v.index in gate_updates:
+                physical_qubits = gate_updates[v.index]
+            else:
+                physical_qubits = [logical_to_physical[q] for q in v['qubits']]      
+            op = _vertex_to_circuit_operation(circuitboard, v['name'], physical_qubits, arguments)
+            if platform is None or _is_valid(op, platform):
                 operations.append(op)
         elif v["type"] == NodeType.caller.value:
             # customized gate
             gatename = v["name"]
             if gatename not in customized_op:
-                customized_op[gatename] = _expand_customized_gate(gatename, sorted_vs, ir.dag)
-            oplist = _customized_vertex_to_circuit_operation(circuitboard, gatename, v)
-            if p is not None:
+                customized_op[gatename] = _expand_customized_gate(gatename, ir.dag)
+            
+            global_qubits = [logical_to_physical[q] for q in v['qubits']]
+            global_arguments = v['params']
+            oplist = _customized_vertex_to_circuit_operation(circuitboard, gatename, v.index, global_qubits, global_arguments, swap_fixes, gate_updates, ir.dag)
+
+            if platform is not None:
                 for op in oplist:
-                    if _is_valid(op, p):
+                    if _is_valid(op, platform):
                         operations.append(op)
             else:
                 operations.extend(oplist)

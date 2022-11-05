@@ -13,12 +13,14 @@
 # limitations under the License.
 
 from typing import Any
-from abc import abstractmethod,ABCMeta
+from abc import abstractmethod, ABCMeta
+
 
 class Compiler(metaclass=ABCMeta):
-    
+
+    def __init__(self):
+        pass
+
     @abstractmethod
     def compile(self, code: Any, level: int):
         raise NotImplementedError('Compiler superclass should not be used')
-        
-

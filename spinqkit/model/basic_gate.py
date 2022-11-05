@@ -43,7 +43,7 @@ class Gate(object):
         self.__matrix = func
 
     def get_matrix(self, *params: Tuple) -> np.ndarray:
-        if self.__matrix == None:
+        if self.__matrix is None:
             return None
 
         if len(params) > 0:
@@ -57,7 +57,7 @@ class Gate(object):
         return mat
 
 class GateBuilder(object):
-    """ Build a compound gate
+    """ Build a composite gate
         The factors list contains each subgate and the indexes of qubits it will use.
         The param_lambda uses the whole super parameter list to calculate the parameters of a subgate.
         The param_lambda could be None.
@@ -67,9 +67,28 @@ class GateBuilder(object):
         self.__gate = Gate(gate_name, qubit_num)
 
     def append(self, gate: Gate, qubits: List, param_lambda: Union[float,Callable] = None):
+        if isinstance(qubits, int):
+            qubits = [qubits]
         if isinstance(param_lambda, float):
-            param_lambda = eval('lambda *args: ' + str(param_lambda))
-        self.__gate.factors.append((gate, qubits, param_lambda))
+            param_value = param_lambda
+            param_lambda = lambda *args: param_value
+        if param_lambda is None:
+            self.__gate.factors.append((gate, qubits))
+        else:
+            self.__gate.factors.append((gate, qubits, param_lambda))
+
+    def print_factors(self):
+        for g, q, p in self.__gate.factors:
+            print(g.label)
+            print(q)
+            if p is not None:
+                print(p())
+            
+    def set_matrix(self, mat):
+        self.__gate.matrix = mat
+
+    def size(self):
+        return len(self.__gate.factors)
 
     def to_gate(self):
         return self.__gate

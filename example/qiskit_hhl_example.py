@@ -34,7 +34,7 @@
 # Expect to have peak at '0100001' (around 336), then a lower peak at '1100001' (around 288), then a lower peak at '1000001' (around 190), then a lower peak at '1100000' (around 120)
 #
 import numpy as np
-from qiskit import QuantumCircuit
+from spinqkit.qiskit import QuantumCircuit
 from qiskit.algorithms.linear_solvers.hhl import HHL
 from qiskit.algorithms.linear_solvers.matrices import TridiagonalToeplitz
 from qiskit.algorithms.linear_solvers.observables import MatrixFunctional
@@ -79,4 +79,5 @@ print(result.counts)
 # solution = hhl.solve(matrix, qc, observable)
 # print(solution)
 # print(solution.state)
+
 

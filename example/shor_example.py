@@ -75,11 +75,10 @@ def qpe_amod15(a):
     config.configure_measure_qubits(list(range(n_count)))
 
     result = engine.execute(exe, config)
-    readings = result.get_readings()
+    reading = result.get_random_reading()
 
-    idx = random.randint(0, len(readings))
-    print('reading: ' + readings[idx])
-    phase = int(readings[idx][::-1], 2) / (2**n_count)
+    phase = int(reading[::-1], 2) / (2**n_count)
+    print('reading: ' + reading)
     print('phase: ' + str(phase))
     return phase
 
@@ -93,14 +92,11 @@ while not factor_found and attempt < 10:
     phase = qpe_amod15(a)
     frac = Fraction(phase).limit_denominator(N)
     r = frac.denominator
-    print("Result: r = %i" % r)
+    print("Order: r = %i" % r)
     if phase != 0:
         guesses = [gcd(a**(r//2)-1, N), gcd(a**(r//2)+1, N)]
-        factor_num = 0
         for guess in guesses:
             if guess not in [1,N] and (N % guess) == 0: # Check to see if guess is a factor
                 print("*** Non-trivial factor found: %i ***" % guess)
-                factor_num += 1
-        if factor_num == 2 and guesses[0] * guesses[1] == N:
-            factor_found = True
-            print("Guessed Factors: %i and %i" % (guesses[0], guesses[1]))
+                factor_found = True
+

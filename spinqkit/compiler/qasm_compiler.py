@@ -18,10 +18,12 @@ from .qasm.Qasm2ErrorListener import Qasm2ErrorListener
 from .qasm.Qasm2EventListener import Qasm2EventListener
 from .qasm.Qasm2Lexer import Qasm2Lexer
 from .qasm.Qasm2Parser import Qasm2Parser
+from spinqkit.compiler.compiler import Compiler
 
-class QASMCompiler:
-    def __init__(Compiler):
-        pass
+
+class QASMCompiler(Compiler):
+    def __init__(self):
+        super().__init__()
 
     def compile(self, filepath: str, level: int):
         ir = IntermediateRepresentation()
@@ -30,15 +32,16 @@ class QASMCompiler:
         stream = CommonTokenStream(lexer)
         parser = Qasm2Parser(stream)
         error_listener = Qasm2ErrorListener()
-        gate_sym_table = {'U':1, 'CX':2, 'id':1, 'h':1, 'x':1, 'y':1, 'z':1, 'rx':1, 'ry':1, 'rz':1, 't':1, 'tdg':1, 's':1, 'sdg':1, 'p':1, 'cx':2, 'cy':2,'cz':2, 'swap':2, 'ccx':3, 'u':1}
-        param_num_table = {'U':3, 'u':3, 'rx':1, 'ry':1, 'rz':1, 'p':1}
+        gate_sym_table = {'U': 1, 'CX': 2, 'id': 1, 'h': 1, 'x': 1, 'y': 1, 'z': 1, 'rx': 1, 'ry': 1, 'rz': 1, 't': 1,
+                          'tdg': 1, 's': 1, 'sdg': 1, 'p': 1, 'cx': 2, 'cy': 2, 'cz': 2, 'swap': 2, 'ccx': 3, 'u': 1}
+        param_num_table = {'U': 3, 'u': 3, 'rx': 1, 'ry': 1, 'rz': 1, 'p': 1}
         parser_listener = Qasm2EventListener(ir, gate_sym_table, param_num_table)
         parser.addErrorListener(error_listener)
         parser.addParseListener(parser_listener)
-        tree = parser.program()
+        parser.program()
 
         if len(error_listener.errors) > 0 or len(parser_listener.errors) > 0:
             return None
-        
+
         ir.build_dag()
         return ir

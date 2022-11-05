@@ -28,10 +28,7 @@ class UnsupportedGateError(SpinQError):
 class UnsupportedQiskitInstructionError(SpinQError):
     pass
 
-class UnsupportedGateError(SpinQError):
-    pass
-
-class UnsupportedQiskitInstructionError(SpinQError):
+class InappropriateBackendError(SpinQError):
     pass
 
 class SpinQCloudServerError(SpinQError):
@@ -59,4 +56,7 @@ class OptimizerError(SpinQError):
     pass
 
 class DecomposerError(SpinQError):
+    pass
+
+class RoutingError(SpinQError):
     pass

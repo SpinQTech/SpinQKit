@@ -14,8 +14,8 @@
 
 import json
 import time, datetime
-from typing import List, Optional
-from .circuit import Circuit, CircuitOperation
+from typing import Optional
+from .circuit import Circuit
 from spinqkit.backend.client.spinq_cloud_client import SpinQCloudClient
 from ..exceptions import *
 from math import log
@@ -47,22 +47,32 @@ def intToBinary(n, digits=-1):
         res = "0" + res
     return res
 
+def phy_to_log_model_key_mapping(model_key: str, phy_to_log_mapping: dict):
+    res = '0'*len(model_key)
+    for i in range(len(model_key)):
+        log_bit = phy_to_log_mapping[i]
+        res = res[:log_bit] + model_key[i] + res[log_bit+1:len(res)]
+    return res
+
 class Task:
-    def __init__(self, name: str = "Untitled Task", platform_code: Optional[str] = None, circuit: Optional[Circuit] = None, calc_matrix: bool = False, shots: Optional[int] = None, process_now: bool = True, description: str = None, api_client: Optional[SpinQCloudClient] = None):
+    def __init__(self, name: str = "Untitled Task", platform_code: Optional[str] = None, circuit: Optional[Circuit] = None, phy_to_log_mapping: dict = None, calc_matrix: bool = False, shots: Optional[int] = None, process_now: bool = True, description: str = None, api_client: Optional[SpinQCloudClient] = None):
         self._api_client = api_client
         self.task_name = name
         self._bitnum = 0
         self._active_bits = []
-        # self._create_time = time.time()
         self._platform_code = platform_code
+        if phy_to_log_mapping is not None:
+            # mapping between logic and physical qubits
+            # bitnum and active bits get from this mapping
+            # if get from circuit, has problem than bitnum acutally less than registed
+            self.set_phy_to_log_mapping(phy_to_log_mapping)
         self._calc_matrix = calc_matrix
         self._shots = shots
         self._source_type = SRC_TYPE_SPINQKIT
         self._processNow = process_now
         self.description = description
         self._circuit = None
-        if circuit is not None and len(circuit.operations) > 0:
-            self.set_circuit(circuit)
+        self._circuit = circuit
         # Properties should not have value before sending to the cloud server
         self._task_code = None
         self._status = None
@@ -79,6 +89,10 @@ class Task:
     @property
     def task_code(self):
         return self._task_code
+
+    @property
+    def phy_to_log_mapping(self):
+        return self._phy_to_log_mapping
 
     @property
     def created_time(self):
@@ -104,13 +118,17 @@ class Task:
 
     def set_circuit(self, circuit: Circuit):
         self._circuit = circuit
-        self._calc_operation_properties(circuit)
 
     def set_calc_matrix(self, calc_matrix: bool):
         self._calc_matrix = calc_matrix
 
     def set_shots(self, shots: int):
         self._shots = shots
+    
+    def set_phy_to_log_mapping(self, phy_to_log_mapping: dict):
+        self._phy_to_log_mapping = phy_to_log_mapping
+        self._bitnum = len(phy_to_log_mapping)
+        self._active_bits = [i+1 for i in list(phy_to_log_mapping.keys())]
 
     def set_task_code(self, code: str):
         self._task_code = code
@@ -159,6 +177,7 @@ class Task:
             module_map = {}
             for idx, m in enumerate(module_list):
                 k = intToBinary(idx, bitnum)
+                k = phy_to_log_model_key_mapping(k, self._phy_to_log_mapping)
                 module_map[k] = m
             return module_map
         elif res.status_code == 202:
@@ -172,15 +191,6 @@ class Task:
                 raise SpinQCloudServerError(res_entity["msg"])
             else:
                 raise SpinQCloudServerError("Retrieve task status failed")
-
-    def _calc_operation_properties(self, circuit: Circuit):
-        self._active_bits = []
-        for operation in circuit.operations:
-            bitlist = operation.qubits
-            for bit in bitlist:
-                if bit not in self._active_bits:
-                    self._active_bits.append(bit)
-        self._bitnum = len(self._active_bits)
 
     def to_dict(self):
         task_dict = {
@@ -207,6 +217,7 @@ class Task:
             "platformCode": self._platform_code,
             "description": self.description,
             "circuit": self._circuit.to_dict(),
-            "activeBits": self._active_bits
+            "activeBits": self._active_bits,
+            "shots": self._shots
         }
         return task_dict

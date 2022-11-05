@@ -33,9 +33,10 @@ class SpinQuasar {
 private:
     static bool running;
     static vector<double> probabilities;
-
+    static string username;
+    static string password;
 public:
-    static void init(const string& ip);
+    static void init(const string& ip, const unsigned short port, const string& user, const string& pwd);
     static vector<double> triangulum_run(const string& task_name, const string& task_desc, const string& circuit, int qnum);
     static void on_opened();
     static void on_close();

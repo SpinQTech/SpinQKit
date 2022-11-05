@@ -20,7 +20,7 @@ import cmath
 from .ZYZdecomposer import decompose_zyz
 from spinqkit.model import Instruction
 from spinqkit.model import DecomposerError
-from spinqkit.model import I, Rz, Ry, CX, CY, CZ
+from spinqkit.model import I, Rz, Ry, CX
 
 TOLERANCE = 1.e-15
 LOOP_LIMIT = 100

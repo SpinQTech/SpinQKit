@@ -13,8 +13,8 @@
 # limitations under the License.
 
 from spinqkit import get_basic_simulator, get_compiler, BasicSimulatorConfig
-from qiskit import QuantumCircuit
-from qiskit.circuit.library import PhaseEstimation
+from spinqkit.qiskit import QuantumCircuit
+from spinqkit.qiskit.circuit.library import PhaseEstimation
 from math import pi
 
 unitary = QuantumCircuit(2)
@@ -53,4 +53,5 @@ print(result.counts)
 
 # print("======= IBM aer simulate result =======")
 # print(result.get_counts())
+
 

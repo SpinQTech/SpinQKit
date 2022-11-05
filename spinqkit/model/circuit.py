@@ -65,11 +65,12 @@ class Circuit(object):
             qubits = other[1]
         else:
             qubits = [other[1]]
+        
         self.append(other[0], qubits, [], *(other[2:]))
         return self
 
     def __or__(self, other: Tuple):
-        self.instructions[-1].set_condition(other[0], other[1], other[2])
+        self.__instructions[-1].set_condition(other[0], other[1], other[2])
 
     def measure(self, qubits: Union[int, List[int]], clbits: Union[int, List[int]]):
         if isinstance(qubits, int):
@@ -78,8 +79,15 @@ class Circuit(object):
             clbits = [clbits]
         if len(qubits) != len(clbits):
             raise Exception('The number of qubits does not match the number of classical bits.')
-        self.instructions.append(Instruction(MEASURE, qubits, clbits))
+        self.__instructions.append(Instruction(MEASURE, qubits, clbits))
         
 
     def append(self, gate: Gate, qubits: List[int] = [], clbits: List[int] = [], *params: Tuple):
-        self.instructions.append(Instruction(gate, qubits, clbits, *params))
+        self.__instructions.append(Instruction(gate, qubits, clbits, *params))
+
+    def append_instruction(self, inst: Instruction):
+        self.__instructions.append(inst)
+
+    def extend(self, inst_list: List):
+        for inst in inst_list:
+            self.append_instruction(inst)

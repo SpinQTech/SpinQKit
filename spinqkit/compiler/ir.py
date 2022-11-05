@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Callable, Union
+from typing import List, Callable
 from igraph import *
 from spinqkit.model import I, H, X, Y, Z, Rx, Ry, Rz, T, Td, S, Sd, P, CX, CY, CZ, SWAP, CCX, U, MEASURE
 from spinqkit.model import Instruction, Gate
 import enum
+import numpy as np
 
 class NodeType(enum.Enum):
     op = 0
@@ -26,6 +27,7 @@ class NodeType(enum.Enum):
     register = 4
     init_qubit = 5
     init_clbit = 6
+    unitary = 7
 
 class Comparator(enum.Enum):
     EQ = 0
@@ -36,7 +38,7 @@ class Comparator(enum.Enum):
     GE = 5
 
 class IntermediateRepresentation():
-    basis_set = {I, H, X, Y, Z, Rx, Ry, Rz, T, Td, S, Sd, P, CX, CY, CZ, SWAP, CCX, U, MEASURE}
+    basis_set = {I, H, X, Y, Z, Rx, Ry, Rz, T, Td, S, Sd, P, CX, CY, CZ, SWAP, CCX, U, MEASURE} # 只包含硬件直接支持的门
     label_set = {g.label for g in basis_set}
 
     @classmethod
@@ -105,7 +107,7 @@ class IntermediateRepresentation():
         self.dag.vs[index]['type'] = NodeType.op.value
         self.dag.vs[index]['name'] = gatename
         self.dag.vs[index]['qubits'] = qubits
-        if params != None and len(params) > 0:
+        if params is not None and len(params) > 0:
             self.dag.vs[index]['params'] = params
 
         for i in qubits:
@@ -138,10 +140,14 @@ class IntermediateRepresentation():
         for j in range(clbit_num):
             self.leaves[f'_c{j}'] = index
 
-    def add_callee_node(self, gatename: str, params: List[Callable], qubits: List[int], clbits: List[int], param_idx: List[int]) -> int:
+    def add_callee_node(self, gatename: str, params: List[Callable], qubits: List[int], 
+                        clbits: List[int], param_idx: List[int], is_caller: bool = False) -> int:
         self.dag.add_vertices(1)
         index = self.dag.vcount() - 1
-        self.dag.vs[index]['type'] = NodeType.callee.value
+        if is_caller:
+            self.dag.vs[index]['type'] = NodeType.caller.value
+        else:
+            self.dag.vs[index]['type'] = NodeType.callee.value
         self.dag.vs[index]['name'] = gatename
         self.dag.vs[index]['qubits'] = qubits
         
@@ -155,6 +161,7 @@ class IntermediateRepresentation():
             self.edge_attributes[len(self.edges)-1] = {"qubit": i}
             self.leaves[f'_q{i}'] = index
 
+
         if len(clbits) > 0:
             for j in clbits:
                 leaf = self.leaves[f'_c{j}']
@@ -164,7 +171,10 @@ class IntermediateRepresentation():
 
         return index
 
-    def add_caller_node(self, gatename: str, params: List[Union[Callable,int]], qubits: List[int], clbits: List[int], param_idx: List[int]) -> int:
+    def add_caller_node(self, gatename: str, params: List[float], qubits: List[int], clbits: List[int] = []) -> int:
+        '''
+        A caller node may also be one callee node for another caller node, in which case, the node is added by add_callee_node.
+        '''
         self.dag.add_vertices(1)
         index = self.dag.vcount() - 1
         self.dag.vs[index]['type'] = NodeType.caller.value
@@ -173,13 +183,11 @@ class IntermediateRepresentation():
 
         if len(params) > 0:
             self.dag.vs[index]['params'] = params
-        if len(param_idx) > 0:
-            self.dag.vs[index]['pindex'] = param_idx
+        # if len(param_idx) > 0:
+        #     self.dag.vs[index]['pindex'] = param_idx
 
         for i in qubits:
             leaf = self.leaves[f'q{i}']
-            # edge = self.dag.add_edge(leaf, index)
-            # edge["qubit"] = i
             self.edges.append((leaf, index))
             self.edge_attributes[len(self.edges)-1] = {"qubit": i}
             self.leaves[f'q{i}'] = index
@@ -187,15 +195,36 @@ class IntermediateRepresentation():
         for j in clbits:
             leaf = self.leaves[f'c{j}']
             self.edges.append((leaf, index))
-            self.edge_attributes[len(self.edges)-1] = {"clbit": i}
+            self.edge_attributes[len(self.edges)-1] = {"clbit": j}
             self.leaves[f'c{j}'] = index
 
         return index
 
+    def add_caller_matrix(self, node_index: int, matrix: np.ndarray, control_bits: int = 0, inverse: bool = False):
+        self.dag.vs[node_index]['matrix'] = matrix
+        self.dag.vs[node_index]['ctrl_num'] = control_bits
+        self.dag.vs[node_index]['inverse'] = inverse
+
+    def add_unitary_node(self, gatename: str, matrix: np.ndarray, qubits: List[int], ctrl_num: int, inverse: bool) -> int:
+        self.dag.add_vertices(1)
+        index = self.dag.vcount() - 1
+        self.dag.vs[index]['type'] = NodeType.unitary.value
+        self.dag.vs[index]['name'] = gatename
+        self.dag.vs[index]['qubits'] = qubits
+        self.dag.vs[index]['ctrl_num'] = ctrl_num
+        self.dag.vs[index]['inverse'] = inverse
+        self.dag.vs[index]['matrix'] = matrix
+        for i in qubits:
+            leaf = self.leaves[f'q{i}']
+            self.edges.append((leaf, index))
+            self.edge_attributes[len(self.edges)-1] = {"qubit": i}
+            self.leaves[f'q{i}'] = index
+        return index 
+
     def add_node_condition(self, node: int, clbits: List, cmp: str, val: int):
         '''
         Only use this function when creating the IR dag.
-        Otherwise the vertices in leaves may change. 
+        Otherwise, the vertices in leaves may change.
         '''
         for i in clbits:
             leaf = self.leaves[f'c{i}']
@@ -205,10 +234,54 @@ class IntermediateRepresentation():
         self.dag.vs[node]['cmp'] = self.get_comparator(cmp)
         self.dag.vs[node]['constant'] = val
 
+    def insert_nodes(self, instructions: List, positions: List, type: int):
+        """
+        Insert instructions into positions specified by gate ids.
+        """
+        local_leaves = {}
+        path_ends = {}
+        for inst, physical_qubits in instructions:
+            self.dag.add_vertices(1)
+            index = self.dag.vcount() - 1
+            self.dag.vs[index]['type'] = type
+            self.dag.vs[index]['name'] = inst.get_op()
+            self.dag.vs[index]['qubits'] = physical_qubits
+            if len(inst.params) > 0:
+                self.dag.vs[index]['params'] = inst.params
+            
+            remaining_qubits = set()
+            for qubit in inst.qubits:
+                if qubit in local_leaves:
+                    self.dag.add_edge(local_leaves[qubit], index)
+                    local_leaves[qubit] = index
+                else:
+                    remaining_qubits.add(qubit)
+            if len(remaining_qubits) > 0:
+                edges_to_remove = []
+                for node in positions:
+                    in_edges = self.dag.vs[node].in_edges()
+                    for edge in in_edges:
+                        if edge['qubit'] in remaining_qubits:
+                            self.dag.add_edge(edge.source, index)
+                            local_leaves[edge['qubit']] = index
+                            path_ends[edge['qubit']] = node
+                            remaining_qubits.remove(edge['qubit'])
+                            edges_to_remove.append(edge)
+                    if len(remaining_qubits) == 0:
+                       break        
+                self.dag.delete_edges(edges_to_remove)
+            if len(remaining_qubits) > 0:
+                for i in remaining_qubits:
+                    leaf = self.leaves[f'q{i}']
+                    self.dag.add_edge(leaf, index)
+        for q in path_ends.keys():
+            self.dag.add_edge(local_leaves[q], path_ends[q])
+    
     def substitute_nodes(self, nodes: List[int], ins_list: List[Instruction], type: int) -> List:
-        '''
+        """
         Substitute only 1q or 2q paths. The in_map and out_map have the same size.
-        '''
+        This function does not remove nodes directly because igraph will change vids after deletion.
+        """
         node_set = set(nodes)
         in_map = {}
         in_conbit_map = {}
@@ -217,9 +290,9 @@ class IntermediateRepresentation():
             in_edges.extend(self.dag.vs[vindex].in_edges())
         in_edges.sort(key = lambda k: k.index)    
         for e in in_edges:
-            if 'qubit' in e.attributes() and e['qubit'] != None and e.source not in node_set:
+            if 'qubit' in e.attributes() and e['qubit'] is not None and e.source not in node_set:
                 in_map[e['qubit']] = e.source
-            if 'conbit' in e.attributes() and e['conbit'] != None and e.source not in node_set:
+            if 'conbit' in e.attributes() and e['conbit'] is not None and e.source not in node_set:
                 in_conbit_map[e['conbit']] = e.source
 
         out_map = {}
@@ -230,13 +303,13 @@ class IntermediateRepresentation():
             out_edges.extend(self.dag.vs[vindex].out_edges())
         out_edges.sort(key = lambda k: k.index)
         for e in out_edges:
-            if 'qubit' in e.attributes() and e['qubit'] != None and e.target not in node_set:
+            if 'qubit' in e.attributes() and e['qubit'] is not None and e.target not in node_set:
                 q = e['qubit']
                 out_map[q] = e.target
                 out_list.append(q)
-            if 'conbit' in e.attributes() and e['conbit'] != None and e.target not in node_set:
+            if 'conbit' in e.attributes() and e['conbit'] is not None and e.target not in node_set:
                 out_conbit_map[e['conbit']] = e.target
-        
+
         new_nodes = []
         for inst in ins_list:
             self.dag.add_vertices(1)
@@ -279,23 +352,23 @@ class IntermediateRepresentation():
         return new_nodes
 
     def get_conbits(self, node) -> List[int]:
-        '''
+        """
         The condition bit array is a single clbit or a register with an ascending order.
-        '''
+        """
         in_edges = self.dag.vs[node].in_edges()
         conbits = []
         for e in in_edges:
-            if 'conbit' in e.attributes() and e['conbit'] != None:
+            if 'conbit' in e.attributes() and e['conbit'] is not None:
                 conbits.append(e['conbit'])
         conbits.sort()
         return conbits
 
     def has_same_condition(self, nodes: List[int]) -> bool:
-        '''
+        """
         Return: only return True when all the nodes has the same condition
-        '''
+        """
         first_node = self.dag.vs[nodes[0]]
-        has_condition = 'cmp' in first_node.attributes() and first_node['cmp'] != None
+        has_condition = 'cmp' in first_node.attributes() and first_node['cmp'] is not None
         conbits = self.get_conbits(nodes[0]) if has_condition else []
         if len(nodes) == 1:
             return has_condition
@@ -306,7 +379,7 @@ class IntermediateRepresentation():
         conbits = self.get_conbits(nodes[0]) if has_condition else []
         for n in nodes[1:]:
             node = self.dag.vs[n]
-            n_has_condition = 'cmp' in node.attributes() and node['cmp'] != None
+            n_has_condition = 'cmp' in node.attributes() and node['cmp'] is not None
             if n_has_condition != has_condition:
                 return False
             if n_has_condition:
@@ -320,7 +393,7 @@ class IntermediateRepresentation():
         return True
 
     def remove_nodes(self, nodes: List[int], keep_edge: bool =False):
-        if nodes == None or len(nodes) == 0:
+        if nodes is None or len(nodes) == 0:
             return
         if keep_edge:
             in_map = {}
@@ -364,12 +437,6 @@ class IntermediateRepresentation():
     def plot_dag(self, layout_name="tree", save_path=None, **kargs):
         g = self.dag
         for v in g.vs:
-            if v["qubits"] and len(v["qubits"]) > 0:
-                tmp_qubits = [str(i) for i in v["qubits"]]
-                tmp_str = "_".join(tmp_qubits) 
-                v["label"] = v["name"] + "_" + tmp_str
-            else:
-                v["label"] = v["name"]
-                
+            v["label"] = v["name"] + '_' + str(v.index)
         layout = g.layout(layout_name)
         plot(g, save_path, layout=layout, **kargs)

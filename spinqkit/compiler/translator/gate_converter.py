@@ -16,6 +16,20 @@ from typing import List
 from spinqkit.model import *
 from ..decomposer.ZYZdecomposer import decompose_zyz
 from ..ir import IntermediateRepresentation as IR
+import numpy as np
+
+def is_primary_gate(gate: Gate):
+    if gate in IR.basis_set:
+        return True
+    elif isinstance(gate, MatrixGate):
+        return True
+    elif isinstance(gate, ControlledGate) and (isinstance(gate.base_gate, MatrixGate) or 
+                gate.base_gate in IR.basis_set):
+        return True
+    elif isinstance(gate, InverseGate) and (isinstance(gate.base_gate, MatrixGate) or
+                gate.base_gate in IR.basis_set):
+        return True
+    return False
 
 def decompose_single_qubit_gate(gate: Gate, qubits: List, params: List =[]) -> List:
     decomposition = []
@@ -23,61 +37,35 @@ def decompose_single_qubit_gate(gate: Gate, qubits: List, params: List =[]) -> L
     if len(gate.factors) > 0:
         for f in gate.factors:
             plambda = f[2] if len(f)>2 else None
-            sub_params = [plambda(params)] if plambda!=None and len(params)>0 else []
-            decomposition.append(Instruction(f[0], qubits, [], *sub_params))
+            sub_params = [plambda(params)] if plambda!=None else []
+            if is_primary_gate(f[0]):
+                decomposition.append(Instruction(f[0], qubits, [], *sub_params))
+            else:
+                decomposition.extend(decompose_single_qubit_gate(f[0], qubits, sub_params))
     else:
-        mat = gate.get_matrix()
+        mat = gate.get_matrix(*params)
+        if mat is None:
+            raise UnsupportedGateError(gate.label + ' is not supported. Its matrix representation is None.')
         alpha, beta, gamma, phase = decompose_zyz(mat)
-        decomposition.append(Instruction(Rz, qubits, [alpha]))
-        decomposition.append(Instruction(Ry, qubits, [beta]))
-        decomposition.append(Instruction(Rz, qubits, [gamma]))
+        decomposition.append(Instruction(Rz, qubits, alpha))
+        decomposition.append(Instruction(Ry, qubits, beta))
+        decomposition.append(Instruction(Rz, qubits, gamma))
 
     return decomposition
 
 def decompose_multi_qubit_gate(gate: Gate, qubits: List, params: List =[]) -> List:
-    if isinstance(gate, ControlledGate):
-        return decompose_multi_control_gate(gate, qubits, params)    
-    elif len(gate.factors) > 0:
+    if len(gate.factors) > 0:
         decomposition = []
         for f in gate.factors:
             sub_qubits = [qubits[i] for i in f[1]]
             plambda = f[2] if len(f)>2 else None
-            if plambda!=None:
-                if len(params) == 0:
-                    raise ValueError
-                inst_params = [plambda(params)]
-                decomposition.append(Instruction(f[0], sub_qubits, [], *inst_params))
+            sub_params = [plambda(params)] if plambda is not None else []
+            if is_primary_gate(f[0]):
+                decomposition.append(Instruction(f[0], sub_qubits, [], *sub_params))
+            elif f[0].qubit_num == 1:
+                decomposition.extend(decompose_single_qubit_gate(f[0], sub_qubits, sub_params))
             else:
-                decomposition.append(Instruction(f[0], sub_qubits, []))
-
+                decomposition.extend(decompose_multi_qubit_gate(f[0], sub_qubits, sub_params))
         return decomposition
 
-
-def decompose_multi_control_gate(gate: ControlledGate, qubits: List, params: List) -> List:
-    """ Decompose a multi-qubit controlled gate and return a list of instructions from factor gates.
-        The factor gates of a controlled gate is decomposed recursively when the factors function is called.
-    """
-    decomposition = []
-
-    if gate.subgate in IR.basis_set:
-        for f in gate.factors:
-            sub_qubits = [qubits[i] for i in f[1]]
-            plambda = f[2] if len(f)>2 else None
-            if plambda!=None:
-                if len(params) == 0:
-                    raise ValueError
-                inst_params = [plambda(params)]
-                decomposition.append(Instruction(f[0], sub_qubits, [], *inst_params))
-            else:
-                decomposition.append(Instruction(f[0], sub_qubits, []))
-    else:
-        for f in gate.factors:
-            sub_qubits = [qubits[i] for i in f[1]]
-            plambda = f[2] if len(f)>2 else None
-            sub_params = [plambda(params)] if plambda!=None else []
-            if f[0] in IR.basis_set:
-                decomposition.append(Instruction(f[0], sub_qubits, [], *sub_params))
-            else:
-                decomposition.extend(decompose_multi_control_gate(f[0], sub_qubits, sub_params))
-
-    return decomposition
+    raise UnsupportedGateError(gate.label + ' is not supported.')

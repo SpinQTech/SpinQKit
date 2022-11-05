@@ -53,11 +53,11 @@ class PureStateOnU(object):
             if ir.dag.vs[v]['type'] == NodeType.caller.value:
                 break
             if ir.dag.vs[v]['type'] == NodeType.op.value:
-                if 'cmp' in ir.dag.vs[v].attributes() and ir.dag.vs[v]['cmp'] != None:
+                if 'cmp' in ir.dag.vs[v].attributes() and ir.dag.vs[v]['cmp'] is not None:
                     break
                 gname = ir.dag.vs[v]['name']
                 qargs = ir.dag.vs[v]['qubits']
-                if 'params' in ir.dag.vs[v].attributes() and ir.dag.vs[v]['params'] != None:    
+                if 'params' in ir.dag.vs[v].attributes() and ir.dag.vs[v]['params'] is not None:    
                     params = ir.dag.vs[v]['params']
                 else:
                     params = None

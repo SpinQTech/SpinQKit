@@ -19,6 +19,12 @@ from .gates import *
 def control_basis_decomposition(gate: Gate, qubits: List) -> List:
     if gate == X:
        return [(CX, [qubits[0], qubits[1]])]
+    elif gate == Y:
+        return [(CY, [qubits[0], qubits[1]])]
+    elif gate == Z:
+        return [(CZ, [qubits[0], qubits[1]])] 
+    elif gate == I:
+        return [(I, [qubits[0]]), (I, [qubits[1]])]
     elif gate == H:
         return CH_decomposition(qubits)
     elif gate == P:
@@ -31,6 +37,8 @@ def control_basis_decomposition(gate: Gate, qubits: List) -> List:
         return CS_decomposition(qubits)
     elif gate == Sd:
         return CSd_decomposition(qubits)
+    elif gate == U:
+        return CU_decomposition(qubits)
     elif gate == Rx:
         return CRx_decomposition(qubits)
     elif gate == Ry:
@@ -39,6 +47,8 @@ def control_basis_decomposition(gate: Gate, qubits: List) -> List:
         return CRz_decomposition(qubits)
     elif gate == CX or gate.label == 'CX':
         return CCX_decomposition(qubits)
+    elif gate == CZ:
+        return CCZ_decomposition(qubits)
    
     return []
 
@@ -59,29 +69,29 @@ def CH_decomposition(qubits: List):
 
 def CP_decomposition(qubits: List):
     __factors = []
-    __factors.append((P, [qubits[0]], lambda param: param[0]/2))
+    __factors.append((P, [qubits[0]], lambda params: params[0]/2))
     __factors.append((CX, [qubits[0], qubits[1]]))
-    __factors.append((P, [qubits[1]], lambda param: -param[0]/2))
+    __factors.append((P, [qubits[1]], lambda params: -params[0]/2))
     __factors.append((CX, [qubits[0], qubits[1]]))
-    __factors.append((P, [qubits[1]], lambda param: param[0]/2))
+    __factors.append((P, [qubits[1]], lambda params: params[0]/2))
     return __factors
 
 def CT_decomposition(qubits: List):
     __factors = []
-    __factors.append((P, [qubits[0]], lambda param: pi/8))
+    __factors.append((P, [qubits[0]], lambda *args: pi/8))
     __factors.append((CX, [qubits[0], qubits[1]]))
-    __factors.append((P, [qubits[1]], lambda param: -pi/8))
+    __factors.append((P, [qubits[1]], lambda *args: -pi/8))
     __factors.append((CX, [qubits[0], qubits[1]]))
-    __factors.append((P, [qubits[1]], lambda param: pi/8))
+    __factors.append((P, [qubits[1]], lambda *args: pi/8))
     return __factors
 
 def CTd_decomposition(qubits: List):
     __factors = []
-    __factors.append((P, [qubits[0]], lambda param: -pi/8))
+    __factors.append((P, [qubits[0]], lambda *args: -pi/8))
     __factors.append((CX, [qubits[0], qubits[1]]))
-    __factors.append((P, [qubits[1]], lambda param: pi/8))
+    __factors.append((P, [qubits[1]], lambda *args: pi/8))
     __factors.append((CX, [qubits[0], qubits[1]]))
-    __factors.append((P, [qubits[1]], lambda param: -pi/8))
+    __factors.append((P, [qubits[1]], lambda *args: -pi/8))
     return __factors
 
 def CS_decomposition(qubits: List):
@@ -102,29 +112,39 @@ def CSd_decomposition(qubits: List):
     __factors.append((Td, [qubits[1]]))
     return __factors
 
+def CU_decomposition(qubits: List):
+    __factors = []
+    __factors.append((P, [qubits[0]], lambda params: (params[2]+params[1])/2))
+    __factors.append((P, [qubits[1]], lambda params: (params[2]-params[1])/2))
+    __factors.append((CX, [qubits[0], qubits[1]]))
+    __factors.append((U, [qubits[1]], lambda params: (-params[0]/2, 0, -(params[2]+params[1]))))
+    __factors.append((CX, [qubits[0], qubits[1]]))
+    __factors.append((U, [qubits[1]], lambda params: (params[0]/2, params[1], 0)))
+    return __factors
+
 def CRx_decomposition(qubits: List):
     __factors = []
-    __factors.append((Rz, [qubits[1]], lambda param: pi/2))
+    __factors.append((Rz, [qubits[1]], lambda *args: pi/2))
     __factors.append((CX, [qubits[0], qubits[1]]))
-    __factors.append((Ry, [qubits[1]], lambda param: -param[0]/2))
+    __factors.append((Ry, [qubits[1]], lambda params: -params[0]/2))
     __factors.append((CX, [qubits[0], qubits[1]]))
-    __factors.append((Rz, [qubits[1]], lambda param: -pi/2))
-    __factors.append((Ry, [qubits[1]], lambda param: param[0]/2))
+    __factors.append((Ry, [qubits[1]], lambda params: params[0]/2))
+    __factors.append((Rz, [qubits[1]], lambda *args: -pi/2))
     return __factors
 
 def CRy_decomposition(qubits: List):
     __factors = []
-    __factors.append((Ry, [qubits[1]], lambda param: param[0]/2))
+    __factors.append((Ry, [qubits[1]], lambda params: params[0]/2))
     __factors.append((CX, [qubits[0], qubits[1]]))
-    __factors.append((Ry, [qubits[1]], lambda param: -param[0]/2))
+    __factors.append((Ry, [qubits[1]], lambda params: -params[0]/2))
     __factors.append((CX, [qubits[0], qubits[1]]))
     return __factors
 
 def CRz_decomposition(qubits: List):
     __factors = []
-    __factors.append((Rz, [qubits[1]], lambda param: param[0]/2))
+    __factors.append((Rz, [qubits[1]], lambda params: params[0]/2))
     __factors.append((CX, [qubits[0], qubits[1]]))
-    __factors.append((Rz, [qubits[1]], lambda param: -param[0]/2))
+    __factors.append((Rz, [qubits[1]], lambda params: -params[0]/2))
     __factors.append((CX, [qubits[0], qubits[1]]))
     return __factors
 
@@ -146,4 +166,11 @@ def CCX_decomposition(qubits: List):
     __factors.append((T, [qubits[0]]))
     __factors.append((Td, [qubits[1]]))
     __factors.append((CX, [qubits[0],qubits[1]]))
+    return __factors
+
+def CCZ_decomposition(qubits: List):
+    __factors = []
+    __factors.append((H, [qubits[2]]))
+    __factors.extend(CCX_decomposition(qubits))
+    __factors.append((H, [qubits[2]]))
     return __factors

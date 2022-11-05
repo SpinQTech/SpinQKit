@@ -1,17 +1,10 @@
-/**
- * Copyright 2021 SpinQ Technology Co., Ltd.
+﻿/*
+ * File:   quantum_state.h
+ * Author: Jingen Xiang
+ * Email:  jxiang@spinq.io
+ * Company: 深圳量旋科技有限公司（SpinQ）
+ * Date:    02/2019
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
 #ifndef _QUANTUM_STATE_H_
@@ -53,8 +46,8 @@ public:
     vector<vector<StateType>> getAllQuantumState() const;
     vector<StateType> getInitialQuantumState();
     vector<StateType> getInitialQuantumState() const;
-    vector<StateType> getCurrentQuantumState();
-    vector<StateType> getCurrentQuantumState() const;
+    vector<StateType> & getCurrentQuantumState();
+    const vector<StateType> & getCurrentQuantumState() const;
     double getStateProb() const;
 
     bool reset();   // reset the quantum state to the initial quantum state.
@@ -68,6 +61,13 @@ public:
 
     quantum_state measure_single_qubit(int qubit, int clbit);
     bool check_condition(const condition & cond);
+
+//     void lazy_measure();
+//     double calc_cond_prob(const condition & cond);
+
+// private:
+//     double calc_val_prob(const vector<int> & clbits, int val);
+//     double calc_range_prob(const vector<int> & clbits, int beg, int end);
 };
 
 inline bool operator==(const quantum_state & qs1, const quantum_state & qs2)

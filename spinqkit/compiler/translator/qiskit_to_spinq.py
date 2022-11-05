@@ -14,7 +14,7 @@
 
 from typing import Dict, List, Tuple, Optional
 from math import pi
-import qiskit.circuit as qqc
+import spinqkit.qiskit.circuit as qqc
 from spinqkit.model.gates import * 
 from spinqkit.model import Circuit, UnsupportedQiskitInstructionError
 
@@ -46,23 +46,43 @@ def add_instruction(qc: qqc.QuantumCircuit, circ: Circuit, qreg_map: Dict, creg_
     for reg in qc.qregs:
         if reg.name == 'control':
             ctl_count += reg.size
+        
+    ext_qiskit = __import__('qiskit')
+    ext_circuit = type(None)
+    ext_Clbit = type(None)
+    ext_Gate = type(None)
+    ext_Instruction = type(None)
+    ext_Measure = type(None)
+    ext_Barrier = type(None)
+    ext_ControlledGate = type(None)
+    try:
+        ext_circuit = getattr(ext_qiskit, 'circuit')
+        ext_Clbit = getattr(ext_circuit, 'Clbit')
+        ext_Gate = getattr(ext_circuit, 'Gate')
+        ext_Instruction = getattr(ext_circuit, 'Instruction')
+        ext_Measure = getattr(ext_circuit, 'Measure')
+        ext_Barrier = getattr(ext_circuit, 'Barrier')
+        ext_ControlledGate = getattr(ext_circuit, 'ControlledGate')
+    except (AttributeError):
+        pass
    
     for instruction, qargs, cargs in qc.data:
-        if instruction.condition != None:
+        if instruction.condition is not None:
             classical = instruction.condition[0]
-            if isinstance(classical, qqc.Clbit):
+            if isinstance(classical, (qqc.Clbit, ext_Clbit)):
                 clbits = [creg_map[classical.register.name][classical.index]]
             else:
                 clbits = creg_map[classical.name]
             condition = (clbits, '==', int(instruction.condition[1]))        
 
-        if not isinstance(instruction, (qqc.Gate, qqc.Instruction, qqc.Measure, qqc.Barrier)):
+        if not isinstance(instruction, (qqc.Gate, qqc.Instruction, qqc.Measure, qqc.Barrier, 
+            ext_Gate, ext_Instruction, ext_Measure, ext_Barrier)):
             raise UnsupportedQiskitInstructionError
         
-        if qubits == None: 
+        if qubits is None: 
             sub_qubits = qargs
         else:
-            if isinstance(instruction, qqc.ControlledGate):
+            if isinstance(instruction, (qqc.ControlledGate, ext_ControlledGate)):
                 sub_qubits = []
                 for q in qargs:
                     if q.register.name == 'control':
@@ -75,17 +95,17 @@ def add_instruction(qc: qqc.QuantumCircuit, circ: Circuit, qreg_map: Dict, creg_
         if instruction.name in basis_map.keys():
             gate = basis_map[instruction.name]        
             qlist = [qreg_map[arg.register.name][arg.index] for arg in sub_qubits]
-            if cargs != None:
+            if cargs is not None:
                 clist = [creg_map[arg.register.name][arg.index] for arg in cargs]
             params = instruction.params
             
-            if params != None and len(params) > 0:
-                if condition != None:
-                    circ<< (gate, qlist, *params) | condition
+            if params is not None and len(params) > 0:
+                if condition is not None:
+                    circ<< (gate, qlist, params) | condition
                 else:
-                    circ<< (gate, qlist, *params)
+                    circ<< (gate, qlist, params)
             else:    
-                if condition != None:
+                if condition is not None:
                     if gate == MEASURE:
                         raise UnsupportedQiskitInstructionError('Measure cannot be conditional.')
                     circ<< (gate, qlist) | condition
@@ -94,7 +114,7 @@ def add_instruction(qc: qqc.QuantumCircuit, circ: Circuit, qreg_map: Dict, creg_
                         circ.measure(qlist, clist)
                     else:
                         circ<< (gate, qlist)
-        elif isinstance(instruction, qqc.Barrier):
+        elif isinstance(instruction, (qqc.Barrier, ext_Barrier)):
             continue
         else:
             add_instruction(instruction.definition, circ, qreg_map, creg_map, sub_qubits, condition)

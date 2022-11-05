@@ -14,3 +14,8 @@
 
 from .ZYZdecomposer import decompose_zyz
 from .magic_basis_decomposer import decompose_two_qubit_gate
+from .isometry_decomposer import build_gate_for_isometry
+from .uniformly_controlled_rotation_gate import generate_uc_rot_gates
+from .diagonal import generate_diagnoal_gates
+from .uniformly_controlled_gate import generate_ucg_diagonal
+from .multi_controlled_gate import generate_mcg_diagonal
