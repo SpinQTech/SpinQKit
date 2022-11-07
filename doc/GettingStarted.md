@@ -2,7 +2,7 @@
 ## Requirements
 
 - SpinQKit is available on Windows, Linux and MacOS. Only the **Windows** version can use the  Triangulum machine as a backend. This package has been tested on Ubuntu 20.04, Windows 10, Mac Mojave 10.14.8 and Mac Monterey 13.4.
-- SpinQKit requires Python 3.8+.  This package has been tested with Python 3.8.13, 3.9.4 and 3.9.12.
+- SpinQKit requires Python 3.8+.  This package has been tested with Python 3.8.13 and 3.9.12.
 - We suggest you use Anaconda to set up your Python environment. Please refer to [https://docs.anaconda.com/anaconda/](https://docs.anaconda.com/anaconda/) about how to install and use a conda environment. On Windows, we suggest adding Anaconda to your PATH environment viarable to avoid unnecessary troubles.
 ## Installation
 SpinQKit can be installed using the following command:

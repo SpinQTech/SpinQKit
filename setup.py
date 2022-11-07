@@ -91,7 +91,7 @@ if platform.system() == 'Windows':
 
 setup(
     name="spinqkit",
-    version="0.0.2",
+    version="0.0.3",
     description="SpinQ Quantum Software Development Kit",
     packages=find_packages(),
     

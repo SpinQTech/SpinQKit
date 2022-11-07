@@ -22,10 +22,10 @@ from Crypto.Signature import PKCS1_v1_5 as Signature_pkcs1_v1_5
 from Crypto.PublicKey import RSA
 import base64
 
-username = "weixin-1638930246372"
+username = "username"
 message = username.encode(encoding="utf-8")
 
-with open("/home/cong/.ssh/id_rsa") as f:
+with open("/path/to/id_rsa") as f:
     key = f.read()
 
 rsakey = RSA.importKey(key)
